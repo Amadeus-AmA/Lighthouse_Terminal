@@ -1,0 +1,39 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 备份导出文件夹
+backup/
+
+# 虚拟环境
+.trae/
+venv/
+env/
+.venv
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 日志和临时文件
+*.log
+*.tmp
+*.bak
+
+# 打包输出
+dist/
+build/
+*.egg-info/
+
+# EEPROM 备份文件（如果你不想上传）
+*.bin
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 用户配置文件（如果你有本地配置）
+config.local.py
