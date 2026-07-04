@@ -4,6 +4,8 @@ import threading
 import time
 from collections import defaultdict
 
+TIMEBASE_HZ = 48_000_000
+
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.figure import Figure
@@ -55,7 +57,7 @@ class DumpViewer:
                 if parsed is not None:
                     if base_time is None:
                         base_time = parsed["timestamp"]
-                    rel_time = (parsed["timestamp"] - base_time) / 1_000_000.0
+                    rel_time = (parsed["timestamp"] - base_time) / TIMEBASE_HZ
                     self._data.append((rel_time, parsed["phase_error"]))
 
             parent_tk.after(0, lambda: self._show_chart())
@@ -67,7 +69,7 @@ class DumpViewer:
             return
 
         window = Toplevel()
-        window.title("Dump 相位误差趋势 (20s)")
+        window.title("Dump 相位误差趋势")
         window.geometry("900x400")
 
         fig = Figure(figsize=(10, 4), dpi=100)
