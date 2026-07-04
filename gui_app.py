@@ -12,6 +12,8 @@ from hardware_panel import HardwarePanel
 from dump_viewer import DumpViewer
 from genealogy_panel import GenealogyPanel
 from backup_compare import backup_params_to_json, compare_params, backup_fcal_to_json
+from log_panel import LogPanel
+from ootx_decoder import OotxDecoderPanel
 from data_parser import (
     parse_id_output, parse_laser_status, parse_rotor_status,
     parse_param_uptime, parse_sys_config, parse_journal,
@@ -23,7 +25,7 @@ class LighthouseConsoleApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Lighthouse 基站控制台")
-        self.root.geometry("1200x700")
+        self.root.geometry("1200x800")
 
         self._serial = SerialManager()
         self._serial.set_data_callback(self._on_data_received)
@@ -140,6 +142,18 @@ class LighthouseConsoleApp:
         ttk.Button(dump_tab, text="开始采集 Dump 数据",
                    command=lambda: self._dump_viewer.collect_and_show(self.root)).pack(pady=10)
 
+        log_tab = tk.Frame(self._notebook)
+        self._log_panel = LogPanel(log_tab, self._serial, self._terminal)
+        self._log_panel.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self._notebook.add(log_tab, text="日志设置")
+
+        ootx_tab = tk.Frame(self._notebook)
+        self._ootx_panel = OotxDecoderPanel(ootx_tab, self._serial, self._terminal)
+        self._ootx_panel.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self._notebook.add(ootx_tab, text="OOTX 解码")
+
+        self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+
     def _build_quick_buttons(self):
         btn_frame = tk.Frame(self.root)
         btn_frame.pack(fill=tk.X, padx=4, pady=(0, 4))
@@ -217,6 +231,7 @@ class LighthouseConsoleApp:
         self._fcal_viewer.clear()
         self._hardware_panel.clear_all()
         self._genealogy_panel.clear()
+        self._ootx_panel.clear()
         self._mode_var.set("--")
 
     def _auto_identify(self):
@@ -321,6 +336,16 @@ class LighthouseConsoleApp:
 
     def _compare_params(self):
         compare_params(self.root)
+
+    def _on_tab_changed(self, event):
+        tab_id = self._notebook.index(self._notebook.select())
+        tab_text = self._notebook.tab(tab_id, "text")
+        if not self._serial.is_connected():
+            return
+        if tab_text == "日志设置":
+            self._log_panel.refresh()
+        elif tab_text == "OOTX 解码":
+            self._ootx_panel.refresh()
 
     def _backup_fcal(self):
         if not self._serial.is_connected():

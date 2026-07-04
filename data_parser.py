@@ -368,3 +368,21 @@ def parse_dump_line(line: str) -> dict:
         except ValueError:
             pass
     return None
+
+
+def parse_ootx_hexdump(text: str) -> bytes:
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    start_idx = 0
+    for i, line in enumerate(lines):
+        if "OOTX frame" in line:
+            start_idx = i + 1
+            break
+    all_bytes = []
+    for line in lines[start_idx:]:
+        m = re.match(r'^[0-9A-Fa-f]{8}:\s*([0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})+)', line)
+        if m:
+            for h in m.group(1).split():
+                all_bytes.append(int(h, 16))
+    if len(all_bytes) >= 43:
+        return bytes(all_bytes)
+    return b""
