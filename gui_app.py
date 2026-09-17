@@ -1,4 +1,4 @@
-import tkinter as tk
+﻿import tkinter as tk
 from tkinter import ttk, messagebox, Toplevel
 import threading
 
@@ -13,7 +13,6 @@ from dump_viewer import DumpViewer
 from genealogy_panel import GenealogyPanel
 from backup_compare import backup_params_to_json, compare_params, backup_fcal_to_json
 from log_panel import LogPanel
-from ootx_decoder import OotxDecoderPanel
 from data_parser import (
     parse_id_output, parse_laser_status, parse_rotor_status,
     parse_param_uptime, parse_sys_config, parse_journal,
@@ -147,10 +146,6 @@ class LighthouseConsoleApp:
         self._log_panel.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
         self._notebook.add(log_tab, text="日志设置")
 
-        ootx_tab = tk.Frame(self._notebook)
-        self._ootx_panel = OotxDecoderPanel(ootx_tab, self._serial, self._terminal)
-        self._ootx_panel.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
-        self._notebook.add(ootx_tab, text="OOTX 解码")
 
         self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
@@ -231,7 +226,6 @@ class LighthouseConsoleApp:
         self._fcal_viewer.clear()
         self._hardware_panel.clear_all()
         self._genealogy_panel.clear()
-        self._ootx_panel.clear()
         self._mode_var.set("--")
 
     def _auto_identify(self):
@@ -344,8 +338,6 @@ class LighthouseConsoleApp:
             return
         if tab_text == "日志设置":
             self._log_panel.refresh()
-        elif tab_text == "OOTX 解码":
-            self._ootx_panel.refresh()
 
     def _backup_fcal(self):
         if not self._serial.is_connected():
