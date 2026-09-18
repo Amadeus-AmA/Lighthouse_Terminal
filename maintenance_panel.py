@@ -3,7 +3,10 @@ from tkinter import ttk, messagebox
 import threading
 import time
 
-from backup_compare import restore_params_from_json, restore_fcal_to_device
+from backup_compare import restore_params_from_json, restore_fcal_to_device, BACKUP_DIR
+
+PARTITION_SLOTS = {0: 0x0000, 1: 0x0180, 2: 0x0300}
+PARTITION_SIZE = 0x180
 
 PARTITION_HELP = (
     "Par0 / Par1 为正常运行参数区 (NORM), Par2 为出厂参数区 (FACT)。\n"
@@ -136,17 +139,21 @@ class MaintenancePanel(tk.Frame):
         self._ee_len = tk.Entry(op_row, width=8, font=("Consolas", 9))
         self._ee_len.insert(0, "16")
         self._ee_len.pack(side=tk.LEFT, padx=(4, 12))
-        ttk.Button(op_row, text="读取", command=self._eeprom_read).pack(side=tk.LEFT)
+        ttk.Button(op_row, text="读取", command=self._eeprom_read).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Button(op_row, text="备份整个分区", command=self._backup_partition).pack(side=tk.LEFT, padx=(0, 12))
+        ttk.Button(op_row, text="保存区间到文件", command=self._dump_range).pack(side=tk.LEFT)
 
         ee_body = tk.Frame(ee_frame)
         ee_body.pack(fill=tk.BOTH, expand=True, padx=8, pady=(2, 6))
 
         self._ee_out = tk.Text(ee_body, height=8, wrap=tk.NONE, state="disabled",
                                bg="#1e1e1e", fg="#d4d4d4", font=("Consolas", 9))
-        ee_scroll = ttk.Scrollbar(ee_body, orient=tk.HORIZONTAL, command=self._ee_out.xview)
-        ee_scroll.pack(side=tk.BOTTOM, fill=tk.X)
+        ee_yscroll = ttk.Scrollbar(ee_body, orient=tk.VERTICAL, command=self._ee_out.yview)
+        ee_xscroll = ttk.Scrollbar(ee_body, orient=tk.HORIZONTAL, command=self._ee_out.xview)
+        ee_xscroll.pack(side=tk.BOTTOM, fill=tk.X)
+        ee_yscroll.pack(side=tk.RIGHT, fill=tk.Y)
         self._ee_out.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self._ee_out.configure(xscrollcommand=ee_scroll.set)
+        self._ee_out.configure(xscrollcommand=ee_xscroll.set, yscrollcommand=ee_yscroll.set)
 
     def _eeprom_read(self):
         if not self._serial.is_connected():
@@ -166,6 +173,68 @@ class MaintenancePanel(tk.Frame):
         self._ee_out.configure(state="normal")
         self._ee_out.insert("1.0", text)
         self._ee_out.configure(state="disabled")
+
+    def _dump_range(self):
+        if not self._serial.is_connected():
+            messagebox.showwarning("提示", "请先连接设备")
+            return
+        addr_s = self._ee_addr.get().strip() or "0x00"
+        len_s = self._ee_len.get().strip() or "16"
+        cmd = f"eeprom r {addr_s} {len_s}"
+
+        def work():
+            resp = self._serial.send_command(cmd, wait_response=True, timeout=8.0)
+
+            def done():
+                self._ee_append(f">>> {cmd}\n{resp}\n")
+                if ":" not in resp:
+                    messagebox.showwarning("保存区间", "未获取到数据")
+                    return
+                import os
+                from datetime import datetime
+                os.makedirs(BACKUP_DIR, exist_ok=True)
+                name = f"eeprom_{addr_s}_{len_s}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                path = os.path.join(BACKUP_DIR, name)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(f"# {cmd}\n{resp}")
+                messagebox.showinfo("保存区间完成", f"已保存:\n{path}")
+
+            self.after(0, done)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _backup_partition(self):
+        if not self._serial.is_connected():
+            messagebox.showwarning("提示", "请先连接设备")
+            return
+        try:
+            part_idx = int(self._part_var.get())
+        except ValueError:
+            return
+        addr = PARTITION_SLOTS.get(part_idx)
+        if addr is None:
+            messagebox.showwarning("提示", "未知分区地址")
+            return
+        cmd = f"eeprom r 0x{addr:04X} {PARTITION_SIZE}"
+
+        def work():
+            resp = self._serial.send_command(cmd, wait_response=True, timeout=3.0)
+            def done():
+                self._ee_append(f">>> {cmd}\n{resp}\n")
+                if "0000000" not in resp and ":" not in resp:
+                    messagebox.showwarning("备份分区", f"未获取到分区 {part_idx} 数据")
+                    return
+                import os
+                from datetime import datetime
+                os.makedirs(BACKUP_DIR, exist_ok=True)
+                path = os.path.join(BACKUP_DIR, f"partition{part_idx}_"
+                                    f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(f"# {cmd}\n{resp}")
+                messagebox.showinfo("备份分区完成", f"分区 {part_idx} 原始数据已保存:\n{path}")
+            self.after(0, done)
+
+        threading.Thread(target=work, daemon=True).start()
 
     # ---------- 基站电源 ----------
 

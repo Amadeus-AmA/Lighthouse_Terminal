@@ -13,10 +13,7 @@ from dump_viewer import DumpViewer
 from genealogy_panel import GenealogyPanel
 from laser_panel import LaserPanel
 from maintenance_panel import MaintenancePanel
-from backup_compare import (
-    backup_params_to_json, compare_params, backup_fcal_to_json,
-    backup_all_to_json
-)
+from backup_compare import backup_all_to_json, compare_params
 from log_panel import LogPanel
 from data_parser import (
     parse_id_output, parse_laser_status, parse_rotor_status,
@@ -58,7 +55,7 @@ class LighthouseConsoleApp:
         view_menu.add_checkbutton(label="高级模式（显示维护工具）",
                                   variable=self._advanced_var,
                                   command=self._toggle_advanced)
-        menubar.add_cascade(label="视图", menu=view_menu)
+        menubar.add_cascade(label="高级功能", menu=view_menu)
 
         tools_menu = tk.Menu(menubar, tearoff=0)
         tools_menu.add_command(label="Mode 校准数据图表", command=self._fetch_mode_data)
@@ -207,8 +204,6 @@ class LighthouseConsoleApp:
         ttk.Button(row2, text="命令列表", command=self._show_command_reference).pack(side=tk.LEFT, padx=2)
         ttk.Button(row2, text="保存参数(闪存)", command=lambda: self._send_quick_command("param save")).pack(side=tk.LEFT, padx=2)
         ttk.Button(row2, text="一键备份", command=self._backup_all).pack(side=tk.LEFT, padx=2)
-        ttk.Button(row2, text="备份参数", command=self._backup_params).pack(side=tk.LEFT, padx=2)
-        ttk.Button(row2, text="备份FCAL", command=self._backup_fcal).pack(side=tk.LEFT, padx=2)
         ttk.Button(row2, text="对比参数", command=self._compare_params).pack(side=tk.LEFT, padx=2)
 
     def _scan_ports(self):
@@ -355,18 +350,6 @@ class LighthouseConsoleApp:
         elif not self._advanced_var.get() and managed:
             self._notebook.forget(self._maint_tab)
 
-    def _backup_params(self):
-        if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
-            return
-        self._terminal.append_system("正在备份参数...")
-
-        def do_backup():
-            backup_params_to_json(self._serial, self.root)
-            self.root.after(0, lambda: self._terminal.append_system("参数备份完成"))
-
-        threading.Thread(target=do_backup, daemon=True).start()
-
     def _backup_all(self):
         if not self._serial.is_connected():
             messagebox.showwarning("提示", "请先连接设备")
@@ -397,20 +380,6 @@ class LighthouseConsoleApp:
             return
         if tab_text == "日志设置":
             self._log_panel.refresh()
-
-    def _backup_fcal(self):
-        if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
-            return
-        self._terminal.append_system("正在备份 FCAL 校准参数...")
-
-        serial_number = self._device_info.get("serial_number", "")
-
-        def do_backup():
-            backup_fcal_to_json(self._serial, self.root, serial_number)
-            self.root.after(0, lambda: self._terminal.append_system("FCAL 备份完成"))
-
-        threading.Thread(target=do_backup, daemon=True).start()
 
     def _fetch_mode_data(self):
         if not self._serial.is_connected():

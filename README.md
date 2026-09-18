@@ -57,9 +57,9 @@ Lighthouse 基站串口控制台 — 基于 Python Tkinter 的图形化调试与
 - **进入无线 DFU 模式**：`serial_dfu` 入口（后续用 nrfutil 刷写）
 
 ### 📦 参数备份与对比
-- **备份参数**：一键保存当前 `param list` 为 JSON
-- **备份 FCAL**：一键保存出厂校准参数到 `backup/` 目录，文件名为 `{SN}_fcal.json`
+- **一键备份**：参数列表 + FCAL 出厂校准 + 设备 ID 按序列号自动命名存入 `backup/` 目录
 - **对比参数**：加载两份 JSON 备份，差异行红色高亮
+- **恢复到设备**：维护工具中可从 JSON 备份恢复参数 / 写回 FCAL 校准（自动兼容两种键格式）
 
 ### 🔍 硬件溯源
 - `genealogy list` 解析为结构化面板
