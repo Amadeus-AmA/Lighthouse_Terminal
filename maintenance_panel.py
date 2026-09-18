@@ -4,6 +4,7 @@ import threading
 import time
 
 from backup_compare import restore_params_from_json, restore_fcal_to_device, BACKUP_DIR
+from journal_viewer import open_journal_viewer
 
 PARTITION_SLOTS = {0: 0x0000, 1: 0x0180, 2: 0x0300}
 PARTITION_SIZE = 0x180
@@ -20,6 +21,7 @@ class MaintenancePanel(tk.Frame):
         self._serial = serial_manager
         self._build_partition_area()
         self._build_eeprom_area()
+        self._build_journal_area()
         self._build_power_area()
         self._build_restore_area()
 
@@ -235,6 +237,21 @@ class MaintenancePanel(tk.Frame):
             self.after(0, done)
 
         threading.Thread(target=work, daemon=True).start()
+
+    # ---------- 履历日志 ----------
+
+    def _build_journal_area(self):
+        jf = tk.LabelFrame(self, text="履历日志 (journal 记录区)")
+        jf.pack(fill=tk.X, padx=4, pady=2)
+
+        row = tk.Frame(jf)
+        row.pack(fill=tk.X, padx=8, pady=6)
+        ttk.Button(row, text="扫描并查看履历日志",
+                   command=lambda: open_journal_viewer(self, self._serial)).pack(side=tk.LEFT)
+
+        tk.Label(jf, text="每次开关机都会留下一组 boots/locks/faults/spins/sweeps 快照, "
+                          "可核查设备的真实使用与断电历史。",
+                 font=("", 8), fg="#7f8c8d", anchor="w").pack(anchor="w", padx=8, pady=(0, 6))
 
     # ---------- 基站电源 ----------
 
