@@ -36,4 +36,4 @@ build/
 Thumbs.db
 
 # 用户配置文件（如果你有本地配置）
-config.local.py
+config.local.py*.zip
