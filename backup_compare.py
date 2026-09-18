@@ -1,11 +1,18 @@
 import json
 import os
+import sys
 import threading
 import tkinter as tk
 from datetime import datetime
 from tkinter import ttk, filedialog, messagebox
 
-BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backup")
+# 冻结成 exe 后 __file__ 指向临时解包目录, 备份要放在 exe 旁边才能持久
+if getattr(sys, "frozen", False):
+    _APP_DIR = os.path.dirname(sys.executable)
+else:
+    _APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+BACKUP_DIR = os.path.join(_APP_DIR, "backup")
 
 
 def _ensure_backup_dir():
