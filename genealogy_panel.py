@@ -39,29 +39,29 @@ class GenealogyPanel(tk.Frame):
         )
         header.pack(anchor="w", padx=4, pady=(4, 2))
 
-        self._tree = ttk.Treeview(self, columns=("value",), show="tree headings")
-        self._tree.heading("#0", text="溯源项")
-        self._tree.heading("value", text="信息")
-
-        self._tree.column("#0", width=200)
-        self._tree.column("value", width=520, anchor="w")
-
-        scroll_y = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self._tree.yview)
-        self._tree.configure(yscrollcommand=scroll_y.set)
-
-        self._tree.tag_configure("dim", foreground="#7f8c8d")
-        self._tree.bind("<<TreeviewSelect>>", self._on_row_select)
-
-        for key in GENEALOGY_IDS:
-            label = GENEALOGY_LABELS.get(key, key)
-            self._tree.insert("", tk.END, text=label, values=("--",))
-
+        # 底部编辑区先占位, 再让日志树占满剩余空间
         self._build_editor()
 
         body = tk.Frame(self)
         body.pack(fill=tk.BOTH, expand=True)
-        self._tree.pack(in_=body, side=tk.LEFT, fill=tk.BOTH, expand=True, padx=4, pady=4)
-        scroll_y.pack(in_=body, side=tk.RIGHT, fill=tk.Y)
+
+        self._tree = ttk.Treeview(body, columns=("value",), show="tree headings")
+        self._tree.heading("#0", text="溯源项")
+        self._tree.heading("value", text="信息")
+        self._tree.column("#0", width=200)
+        self._tree.column("value", width=520, anchor="w")
+        self._tree.tag_configure("dim", foreground="#7f8c8d")
+        self._tree.bind("<<TreeviewSelect>>", self._on_row_select)
+
+        scroll_y = ttk.Scrollbar(body, orient=tk.VERTICAL, command=self._tree.yview)
+        self._tree.configure(yscrollcommand=scroll_y.set)
+
+        self._tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
+
+        for key in GENEALOGY_IDS:
+            label = GENEALOGY_LABELS.get(key, key)
+            self._tree.insert("", tk.END, text=label, values=("--",))
 
     # ---------- 编辑区 ----------
 
@@ -166,7 +166,7 @@ class GenealogyPanel(tk.Frame):
         for key in GENEALOGY_IDS:
             label = GENEALOGY_LABELS.get(key, key)
             value = data.get(key, "--")
-            is_dim = value in ("- -", "-", "--")
+            is_dim = value in ("- -", "-", "--") or set(value.split()) == {"-"}
             tags = ("dim",) if is_dim else ()
             self._tree.insert("", tk.END, text=label, values=(value,), tags=tags)
 
