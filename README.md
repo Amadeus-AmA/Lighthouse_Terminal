@@ -4,6 +4,13 @@ Lighthouse 基站串口控制台 — 基于 Python Tkinter 的图形化调试与
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Tkinter](https://img.shields.io/badge/GUI-Tkinter-orange)
+
+## 下载
+
+**免安装 Windows 版**:前往 [Releases](https://github.com/Amadeus-AmA/Lighthouse_Terminal/releases/latest) 下载 `LighthouseTerminal.exe`,双击即用,无需安装 Python。
+
+首次运行如遇 SmartScreen 提示,选择"更多信息" → "仍要运行"(开源程序未做签名)。
+
 ---
 
 ## 功能特性
