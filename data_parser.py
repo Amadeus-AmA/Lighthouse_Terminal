@@ -340,6 +340,39 @@ def parse_fpga(text: str) -> dict:
         val = int(m.group(1), 16)
         result["irq_opto_fe"] = bool(val & 0x10)
         result["irq_opto_re"] = bool(val & 0x20)
+    for reg_name, key in (("LASER_CTRL", "laser_ctrl"),
+                          ("LASER_APC_GAIN", "laser_apc_gain"),
+                          ("LASER_ON_DELAY", "laser_on_delay"),
+                          ("LASER_OFF_DELAY", "laser_off_delay")):
+        m = re.search(reg_name + r':\s*(0x[0-9A-Fa-f]+|\d+)(?:\s*\(([^)]*)\))?', text)
+        if m:
+            result[key] = m.group(1)
+            if m.group(2) is not None:
+                result[key + "_desc"] = m.group(2).strip()
+    return result
+
+
+def parse_param_part(text: str) -> list:
+    """解析 param part 输出
+    格式: Partition 0 @ 0x0000 NORM: 0xC42DFD5A 0xC42DFD5A CRC-OK 21
+    """
+    result = []
+    for line in text.split("\n"):
+        m = re.match(
+            r'Partition\s+(\d+)\s+@\s*(0x[0-9A-Fa-f]+)\s+'
+            r'(NORM|FACT):\s*(0x[0-9A-Fa-f]+)\s+(0x[0-9A-Fa-f]+)\s+'
+            r'(CRC-OK|CRC-BAD)\s+(\d+)',
+            line.strip())
+        if m:
+            result.append({
+                "index": int(m.group(1)),
+                "address": m.group(2),
+                "type": m.group(3),
+                "crc_stored": m.group(4),
+                "crc_calc": m.group(5),
+                "crc_ok": m.group(6) == "CRC-OK",
+                "version": int(m.group(7)),
+            })
     return result
 
 

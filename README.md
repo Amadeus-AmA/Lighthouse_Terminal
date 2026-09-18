@@ -42,6 +42,20 @@ Lighthouse 基站串口控制台 — 基于 Python Tkinter 的图形化调试与
 - 一键采集 Mode 0-16 全部配置参数
 - 三子图：Period / PWM / PLL Offset vs Mode
 
+### ⚡ 激光控制
+- 实时显示激光使能 / 电流 / 目标·实测·平均功率 / 偏置 / 开关相位 / APC（手动刷新 + 3 秒自动刷新）
+- 开关控制：`sys.emission_enable` / `laser.enable` / `laser.interlock` / `laser.fullspin` / `laser.apc`，写操作带确认弹窗
+- 数值参数设置（电流 / 功率 / 偏置 / 相位 / APC 积分系数），附正常基站参考值
+- ISL58303 寄存器：下拉预设 21 个真机寄存器名，支持读取全部 / 单寄存器读写 / 自定义子命令
+- FPGA 激光通道状态：LASER_STATUS / LASER_CTRL / LASER_APC_GAIN / LASER_ON_DELAY / LASER_OFF_DELAY
+
+### 🔧 维护工具（视图 → 高级模式 勾选后显示）
+- **参数闪存分区**：`param part` 表格化显示 Par0/1（NORM）/ Par2（FACT）、CRC 状态（CRC-BAD 红色高亮）、版本号；保存到分区（修复）/ 从分区加载 / 擦除分区
+- **EEPROM 读取**：`eeprom r <地址> <长度>` 十六进制查看器（参数分区从 0x0000 开始，CPRM 魔数 + 版本 + CRC）
+- **基站电源**：`sys.standby` 休眠 / 唤醒一键切换，休眠后串口仍可用
+- **恢复参数备份 / 写入 FCAL 校准**：从 JSON 备份逐条恢复到设备并保存闪存（FCAL 覆盖需二次确认）
+- **进入无线 DFU 模式**：`serial_dfu` 入口（后续用 nrfutil 刷写）
+
 ### 📦 参数备份与对比
 - **备份参数**：一键保存当前 `param list` 为 JSON
 - **备份 FCAL**：一键保存出厂校准参数到 `backup/` 目录，文件名为 `{SN}_fcal.json`
@@ -95,8 +109,10 @@ lighthouse-terminal/
 ├── genealogy_panel.py       # 硬件溯源面板
 ├── calibration_viewer.py    # Mode / PWM 校准图表（matplotlib）
 ├── dump_viewer.py           # Dump 相位误差曲线图（20s 采集）
-├── backup_compare.py        # 参数备份 JSON / 对比差异
-├── data_parser.py           # 命令输出解析器（17 个解析函数）
+├── backup_compare.py        # 参数备份 JSON / 对比差异 / 一键备份 / 恢复到设备
+├── laser_panel.py           # 激光控制面板（状态 / 开关 / ISL58303 寄存器）
+├── maintenance_panel.py     # 维护工具面板（分区 / EEPROM / 休眠 / 恢复 / DFU）
+├── data_parser.py           # 命令输出解析器（18 个解析函数）
 ├── requirements.txt         # 依赖清单
 └── backup/                  # FCAL 备份输出目录（自动创建）
 ```
