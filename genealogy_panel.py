@@ -22,6 +22,21 @@ GENEALOGY_LABELS = {
 # 修改会影响设备识别的字段, 写入前加强确认
 SENSITIVE_IDS = {"model", "top", "main", "upper"}
 
+# 家谱区槽位: model 4 字节, 其余 25 字节/槽 (字符串 null 结尾, 空置 = 全零)
+GENEALOGY_SLOTS = {
+    "model": (0x480, 4),
+    "top": (0x484, 25),
+    "main": (0x49D, 25),
+    "upper": (0x4B6, 25),
+    "antenna": (0x4CF, 25),
+    "laser": (0x4E8, 25),
+    "motor": (0x501, 25),
+    "chassis": (0x51A, 25),
+    "spare1": (0x533, 25),
+    "spare2": (0x54C, 25),
+    "spare3": (0x565, 25),
+}
+
 
 def _display(gid: str) -> str:
     return f"{gid} — {GENEALOGY_LABELS[gid]}"
@@ -89,8 +104,8 @@ class GenealogyPanel(tk.Frame):
         ttk.Button(row, text="写入字段", command=self._write_field).pack(side=tk.LEFT)
 
         self._edit_status = tk.Label(
-            editor, text="提示: spare 槽可随意测试; model/top/main/upper 为设备身份字段, 修改需谨慎。"
-                         "注意: 出厂空置态(显示 - -)无法用 genealogy set 恢复, 需将对应槽位写回全零(见维护文档)。",
+            editor, text="提示: 两栏都填 - = 槽位写零, 恢复出厂空置显示 (- -); "
+                         "spare 槽可随意测试; model/top/main/upper 为设备身份字段, 修改需谨慎。",
             font=("", 8), fg="#7f8c8d", anchor="w")
         self._edit_status.pack(anchor="w", padx=8, pady=(0, 6))
 
@@ -119,36 +134,60 @@ class GenealogyPanel(tk.Frame):
         gid = self._gid_from_display(self._edit_field.get())
         serial = self._edit_serial.get().strip()
         part = self._edit_part.get().strip()
-        if not gid or not serial or not part:
-            messagebox.showwarning("提示", "序列号和版本都要填写 (恢复空置请两栏都填 -)")
+        if not gid:
             return
-        cmd = f"genealogy set {gid} {serial} {part}"
+
+        # 两栏都填 - = 槽位写零, 恢复出厂空置 (genealogy set 只能写入可见字符, 达不到空置态)
+        zero_fill = (serial == "-" and part == "-")
+        if zero_fill:
+            addr, size = GENEALOGY_SLOTS[gid]
+            cmd = f"eeprom w 0x{addr:04X} {size}"
+            data = " ".join(["00"] * size)
+        else:
+            if not serial or not part:
+                messagebox.showwarning("提示", "序列号和版本都要填写 (两栏都填 - 可清零恢复空置)")
+                return
+            cmd = f"genealogy set {gid} {serial} {part}"
+            data = None
+
         sensitive = gid in SENSITIVE_IDS
-        msg = f"即将执行:\n\n{cmd}\n\n"
+        msg = f"即将执行:\n\n{cmd}\n"
+        if data:
+            msg += f"数据: {data}\n"
+        msg += "\n"
+        if zero_fill:
+            msg += f"将把 {gid} 的槽位 (EEPROM 0x{addr:04X}, {size} 字节) 整体清零,\n恢复出厂空置显示。\n"
         if sensitive:
             msg += "该字段是设备身份信息, 修改会影响设备识别!\n"
-        msg += "确认写入?"
+        msg += "\n确认写入?"
         if not messagebox.askyesno("确认写入", msg,
-                                   icon="warning" if sensitive else "info"):
+                                   icon="warning" if (sensitive or zero_fill) else "info"):
             return
 
         self._writing = True
         self._edit_status.configure(text=f"正在写入 {gid} ...", fg="#7f8c8d")
 
         def work():
-            resp = self._serial.send_command(cmd, wait_response=True, timeout=2.0)
+            if zero_fill:
+                # 进入 eeprom 数据录入模式 (此步无提示符, 不等待), 再发数据行
+                self._serial.send_command(cmd, wait_response=False)
+                resp = self._serial.send_command(data, wait_response=True, timeout=3.0)
+            else:
+                resp = self._serial.send_command(cmd, wait_response=True, timeout=2.0)
             lst = self._serial.send_command("genealogy list", wait_response=True, timeout=2.0)
-            self.after(0, lambda: self._after_write(cmd, resp, lst))
+            self.after(0, lambda: self._after_write(zero_fill, gid, cmd, data, resp, lst))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _after_write(self, cmd, resp, lst):
+    def _after_write(self, zero_fill, gid, cmd, data, resp, lst):
         self._writing = False
-        ok = lst and "%GENE" in lst and "usage" not in resp.lower()
-        if lst and "%GENE" in lst:
+        ok = lst and "%GENE" in lst
+        if ok:
             self.load_from_text(lst)
         if ok:
-            self._edit_status.configure(text=f"已执行: {cmd}", fg="#27ae60")
+            prefix = "已清零" if zero_fill else "已执行"
+            detail = f"{cmd}\n{data}" if data else cmd
+            self._edit_status.configure(text=f"{prefix}: {detail}", fg="#27ae60")
         else:
             self._edit_status.configure(text=f"写入可能失败 (设备回显: {resp.strip()[:60]})",
                                         fg="#e74c3c")
