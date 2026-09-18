@@ -11,7 +11,12 @@ from calibration_viewer import CalibrationViewer
 from hardware_panel import HardwarePanel
 from dump_viewer import DumpViewer
 from genealogy_panel import GenealogyPanel
-from backup_compare import backup_params_to_json, compare_params, backup_fcal_to_json
+from laser_panel import LaserPanel
+from maintenance_panel import MaintenancePanel
+from backup_compare import (
+    backup_params_to_json, compare_params, backup_fcal_to_json,
+    backup_all_to_json
+)
 from log_panel import LogPanel
 from data_parser import (
     parse_id_output, parse_laser_status, parse_rotor_status,
@@ -47,6 +52,13 @@ class LighthouseConsoleApp:
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="退出", command=self._on_close)
         menubar.add_cascade(label="文件", menu=file_menu)
+
+        view_menu = tk.Menu(menubar, tearoff=0)
+        self._advanced_var = tk.BooleanVar(value=False)
+        view_menu.add_checkbutton(label="高级模式（显示维护工具）",
+                                  variable=self._advanced_var,
+                                  command=self._toggle_advanced)
+        menubar.add_cascade(label="视图", menu=view_menu)
 
         tools_menu = tk.Menu(menubar, tearoff=0)
         tools_menu.add_command(label="Mode 校准数据图表", command=self._fetch_mode_data)
@@ -128,6 +140,20 @@ class LighthouseConsoleApp:
         self._fcal_viewer.pack(fill=tk.BOTH, expand=True)
         self._notebook.add(fcal_tab, text="校准参数")
 
+        laser_tab = tk.Frame(self._notebook)
+        self._laser_panel = LaserPanel(laser_tab, self._serial)
+        self._laser_panel.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self._notebook.add(laser_tab, text="激光控制")
+
+        maint_tab = tk.Frame(self._notebook)
+        self._maintenance_panel = MaintenancePanel(maint_tab, self._serial)
+        self._maintenance_panel.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        self._notebook.add(maint_tab, text="维护工具")
+
+        self._laser_tab = laser_tab
+        self._maint_tab = maint_tab
+        self._notebook.forget(maint_tab)
+
         genealogy_tab = tk.Frame(self._notebook)
         self._genealogy_panel = GenealogyPanel(genealogy_tab)
         self._genealogy_panel.pack(fill=tk.BOTH, expand=True)
@@ -167,6 +193,7 @@ class LighthouseConsoleApp:
             ("pwmcal", "粗调电机PWM校准"),         
             ("pwmopt", "粗调 PWM 优化搜索"),
             ("pwmgain", "粗/细 PWM 增益测量"),
+            ("step", "转子阶跃响应"),
         ]
         for cmd, label in commands:
             btn = ttk.Button(row1, text=label,
@@ -178,6 +205,8 @@ class LighthouseConsoleApp:
 
         ttk.Button(row2, text="刷新状态", command=self._poll_status).pack(side=tk.LEFT, padx=2)
         ttk.Button(row2, text="命令列表", command=self._show_command_reference).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row2, text="保存参数(闪存)", command=lambda: self._send_quick_command("param save")).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row2, text="一键备份", command=self._backup_all).pack(side=tk.LEFT, padx=2)
         ttk.Button(row2, text="备份参数", command=self._backup_params).pack(side=tk.LEFT, padx=2)
         ttk.Button(row2, text="备份FCAL", command=self._backup_fcal).pack(side=tk.LEFT, padx=2)
         ttk.Button(row2, text="对比参数", command=self._compare_params).pack(side=tk.LEFT, padx=2)
@@ -226,6 +255,8 @@ class LighthouseConsoleApp:
         self._fcal_viewer.clear()
         self._hardware_panel.clear_all()
         self._genealogy_panel.clear()
+        self._laser_panel.clear()
+        self._maintenance_panel.clear()
         self._mode_var.set("--")
 
     def _auto_identify(self):
@@ -316,6 +347,14 @@ class LighthouseConsoleApp:
             self._terminal.append_system(f"正在切换 Mode {mode_val}...")
             self._send_quick_command(f"mode {mode_val}")
 
+    def _toggle_advanced(self):
+        managed = str(self._maint_tab) in self._notebook.tabs()
+        if self._advanced_var.get() and not managed:
+            pos = self._notebook.index(self._laser_tab) + 1
+            self._notebook.insert(pos, self._maint_tab, text="维护工具")
+        elif not self._advanced_var.get() and managed:
+            self._notebook.forget(self._maint_tab)
+
     def _backup_params(self):
         if not self._serial.is_connected():
             messagebox.showwarning("提示", "请先连接设备")
@@ -327,6 +366,26 @@ class LighthouseConsoleApp:
             self.root.after(0, lambda: self._terminal.append_system("参数备份完成"))
 
         threading.Thread(target=do_backup, daemon=True).start()
+
+    def _backup_all(self):
+        if not self._serial.is_connected():
+            messagebox.showwarning("提示", "请先连接设备")
+            return
+        self._terminal.append_system("正在一键备份 (参数 + FCAL + ID)...")
+
+        def do_backup():
+            paths = backup_all_to_json(self._serial, self._device_info.get("serial_number", ""))
+            self.root.after(0, lambda: self._backup_all_done(paths))
+
+        threading.Thread(target=do_backup, daemon=True).start()
+
+    def _backup_all_done(self, paths):
+        if not paths:
+            messagebox.showerror("备份失败", "未获取到设备数据, 请检查连接")
+            return
+        import os
+        self._terminal.append_system("一键备份完成: " + ", ".join(os.path.basename(p) for p in paths))
+        messagebox.showinfo("一键备份完成", "已保存:\n" + "\n".join(paths))
 
     def _compare_params(self):
         compare_params(self.root)
@@ -395,6 +454,7 @@ id             查看设备标识（名称、序列号、OOTX型号、固件版�
 reboot         重启基站
 shutdown       关机（同时断开控制台）
 isp            进入 ISP 引导模式（固件升级用）
+param set sys.standby true/false   休眠/唤醒基站（真机验证可用）
 
 [状态与统计]
 uptime         显示系统本次运行时间
@@ -408,11 +468,14 @@ perf           数学性能基准测试（整数/浮点运算速度）
 param list [pattern]    列出所有参数（支持 pattern 过滤）
 param info <name>       查看参数详细信息
 param get <name>        获取单个参数值
-param set <name> <val>  设置参数值
+param set <name> <val>  设置参数值（布尔参数用 true/false）
 param default <name>    恢复参数为默认值
 param default-all       恢复所有参数为默认值
-param load [partition]  从闪存加载参数
-param save [partition]  保存参数到闪存
+param load [partition]  从闪存分区加载参数
+param save [partition]  保存参数到闪存分区
+param part              查看分区状态（Par0/1=NORM 参数区, Par2=FACT 出厂区）
+param erase <partition> 擦除指定分区（危险）
+param raw <r|w> <addr>  直接读写参数存储区（危险）
 
 [配置模式]
 mode <0-16>     设置运行配置模式
@@ -428,9 +491,17 @@ pwmscan         粗调 PWM 速度扫描
 pwmcal          粗调 PWM 校准
 pwmopt          粗调 PWM 优化搜索
 pwmgain         粗/细 PWM 增益测量
+step            测试转子阶跃响应（电机健康诊断）
 
 [激光]
 isl58303        访问激光驱动器 ISL58303 所有寄存器
+isl58303 <reg>          读取指定寄存器（如 STATUS / ENABLE）
+isl58303 <reg> <val>    写入指定寄存器（危险，慎用）
+param set laser.enable <true|false>   开关激光（已在真机验证）
+laser.current / laser.pwr / laser.bias        激光电流/功率/偏置
+laser.phase.on / laser.phase.off              扫描开/关相位
+laser.interlock / laser.fullspin / laser.apc  互锁/全周扫描/自动功率控制
+sys.emission_enable     全局激光发射使能总开关
 
 [FPGA]
 fpga            访问 FPGA 寄存器（载波、OOTX、激光、电机、时基状态）
@@ -440,7 +511,9 @@ lis2dh          访问 LIS2DH 加速度计寄存器
 
 [EEPROM/RAM]
 ram             RAM 检查
-eeprom          EEPROM 检查和修改
+eeprom r <addr> <len>   读取 EEPROM（hexdump，参数分区从 0x0000 开始，
+                        魔数 CPRM + 版本号 + CRC 与 param part 对应）
+eeprom w ...    EEPROM 写入（写语法待确认，慎用）
 
 [日志/履历]
 genealogy <1|2> 查看系统履历信息（上电次数、运行圈数、故障数等）
@@ -452,7 +525,7 @@ led             控制指示灯颜色 (RGBW, 0-255)
 [无线/DTM]
 dtm             十进制 DTM 测试命令（用于射频认证）
 dtm_pwr         调整 DTM 发射功率
-serial_dfu      请求无线电 DFU 模式
+serial_dfu      请求无线电 DFU 模式（之后用 nrfutil dfu serial -b115200 -prn 1 刷写）
 nonce           生成新的配对码
 radio           无线子命令树
 
