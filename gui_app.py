@@ -152,7 +152,7 @@ class LighthouseConsoleApp:
         self._notebook.forget(maint_tab)
 
         genealogy_tab = tk.Frame(self._notebook)
-        self._genealogy_panel = GenealogyPanel(genealogy_tab)
+        self._genealogy_panel = GenealogyPanel(genealogy_tab, self._serial)
         self._genealogy_panel.pack(fill=tk.BOTH, expand=True)
         self._notebook.add(genealogy_tab, text="硬件溯源")
 
