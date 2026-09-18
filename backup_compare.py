@@ -12,57 +12,6 @@ def _ensure_backup_dir():
     os.makedirs(BACKUP_DIR, exist_ok=True)
 
 
-def backup_fcal_to_json(serial_manager, parent_tk, serial_number=""):
-    resp = serial_manager.send_command("param list", wait_response=True, timeout=3.0)
-    if not resp:
-        messagebox.showwarning("提示", "未获取到参数数据")
-        return
-
-    from data_parser import parse_fcal
-    fcal = parse_fcal(resp)
-    if not fcal:
-        messagebox.showwarning("提示", "未提取到 fcal 校准参数")
-        return
-
-    _ensure_backup_dir()
-
-    if serial_number:
-        filename = f"{serial_number}_fcal.json"
-    else:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"fcal_{timestamp}.json"
-    file_path = os.path.join(BACKUP_DIR, filename)
-
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(fcal, f, indent=2, ensure_ascii=False)
-
-    messagebox.showinfo("备份完成", f"FCAL 校准参数已保存到:\n{file_path}")
-
-
-def backup_params_to_json(serial_manager, parent_tk):
-    resp = serial_manager.send_command("param list", wait_response=True, timeout=3.0)
-    if not resp:
-        messagebox.showwarning("提示", "未获取到参数数据")
-        return
-
-    from data_parser import parse_param_list
-    params = parse_param_list(resp)
-
-    file_path = filedialog.asksaveasfilename(
-        parent=parent_tk,
-        title="保存参数备份",
-        defaultextension=".json",
-        filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")]
-    )
-    if not file_path:
-        return
-
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(params, f, indent=2, ensure_ascii=False)
-
-    messagebox.showinfo("备份完成", f"参数已保存到:\n{file_path}")
-
-
 def compare_params(parent_tk):
     file_a = filedialog.askopenfilename(
         parent=parent_tk,
@@ -274,7 +223,8 @@ def restore_fcal_to_device(serial_manager, parent_tk):
     except Exception as e:
         messagebox.showerror("加载失败", f"无法读取 JSON 文件:\n{e}")
         return
-    keys = [k for k in data if k.startswith("fcal_")]
+    keys = [k for k in data
+            if k.startswith("fcal_") or k.startswith("fcal.")]
     if not keys:
         messagebox.showerror("加载失败", "备份文件中没有 fcal 校准参数")
         return
