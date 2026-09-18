@@ -89,8 +89,8 @@ class GenealogyPanel(tk.Frame):
         ttk.Button(row, text="写入字段", command=self._write_field).pack(side=tk.LEFT)
 
         self._edit_status = tk.Label(
-            editor, text="提示: spare 槽可随意测试; model/top/main/upper 为设备身份字段, 修改需谨慎; "
-                         "填 - - 可恢复空置显示。",
+            editor, text="提示: spare 槽可随意测试; model/top/main/upper 为设备身份字段, 修改需谨慎。"
+                         "注意: 出厂空置态(显示 - -)无法用 genealogy set 恢复, 需将对应槽位写回全零(见维护文档)。",
             font=("", 8), fg="#7f8c8d", anchor="w")
         self._edit_status.pack(anchor="w", padx=8, pady=(0, 6))
 
