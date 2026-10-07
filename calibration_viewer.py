@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import Toplevel
 import re
 
+from i18n import tr_text
+
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.figure import Figure
@@ -30,7 +32,7 @@ class CalibrationViewer:
 
         if self._window is None or not Toplevel.winfo_exists(self._window):
             self._window = Toplevel()
-            self._window.title("Mode 校准数据")
+            self._window.title(tr_text("Mode 校准数据"))
             self._window.geometry("800x500")
 
         for widget in self._window.winfo_children():
@@ -76,7 +78,7 @@ class CalibrationViewer:
 
         if self._window is None or not Toplevel.winfo_exists(self._window):
             self._window = Toplevel()
-            self._window.title("PWM 校准数据")
+            self._window.title(tr_text("PWM 校准数据"))
             self._window.geometry("600x400")
 
         for widget in self._window.winfo_children():

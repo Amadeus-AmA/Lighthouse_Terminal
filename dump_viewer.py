@@ -4,6 +4,8 @@ import threading
 import time
 from collections import defaultdict
 
+from i18n import tr_text
+
 TIMEBASE_HZ = 48_000_000
 
 import matplotlib
@@ -69,7 +71,7 @@ class DumpViewer:
             return
 
         window = Toplevel()
-        window.title("Dump 相位误差趋势")
+        window.title(tr_text("Dump 相位误差趋势"))
         window.geometry("900x400")
 
         fig = Figure(figsize=(10, 4), dpi=100)

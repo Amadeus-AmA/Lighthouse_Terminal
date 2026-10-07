@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 
+from i18n import tr_text
+
 CATEGORIES = [
     ("sys", "系统参数 (sys)"),
     ("journal", "运行履历 (journal)"),
@@ -149,6 +151,7 @@ LIFE_FORMAT_KEYS = {"journal.life"}
 class ParamTreePanel(tk.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
+        self._raw_text = ""
 
         self._tree = ttk.Treeview(self, columns=("value", "dynamic"), show="tree headings")
         self._tree.heading("#0", text="参数名称")
@@ -167,16 +170,35 @@ class ParamTreePanel(tk.Frame):
 
         self._tree.tag_configure("dynamic", foreground="#e5c07b")
 
+        self._insert_categories()
+
+    def _insert_categories(self):
+        self._tree.heading("#0", text=tr_text("参数名称"))
+        self._tree.heading("value", text=tr_text("当前值"))
         for prefix, label in CATEGORIES:
-            self._tree.insert("", tk.END, iid=prefix, text=label, open=False)
+            if self._tree.exists(prefix):
+                self._tree.item(prefix, text=tr_text(label))
+            else:
+                self._tree.insert("", tk.END, iid=prefix, text=tr_text(label), open=False)
+
+    def set_language(self, language=None):
+        if self._raw_text:
+            self.load_from_text(self._raw_text)
+        else:
+            for prefix, label in CATEGORIES:
+                if self._tree.exists(prefix):
+                    self._tree.item(prefix, text=tr_text(label))
 
     def load_from_text(self, text: str):
         from data_parser import parse_param_list, format_life_ticks
 
+        self._raw_text = text
         params = parse_param_list(text)
 
         for item in self._tree.get_children():
             self._tree.delete(*self._tree.get_children(item))
+
+        self._insert_categories()
 
         for key, value in params.items():
             category = key.split(".")[0] if "." in key else "_other"
@@ -199,10 +221,12 @@ class ParamTreePanel(tk.Frame):
                 value_str = str(int(value))
 
             if raw_line and raw_line.rstrip().endswith("*"):
-                self._tree.insert(category, tk.END, text=label, values=(value_str, "*"), tags=("dynamic",))
+                self._tree.insert(category, tk.END, text=tr_text(label), values=(value_str, "*"), tags=("dynamic",))
             else:
-                self._tree.insert(category, tk.END, text=label, values=(value_str, ""))
+                self._tree.insert(category, tk.END, text=tr_text(label), values=(value_str, ""))
 
     def clear(self):
+        self._raw_text = ""
         for item in self._tree.get_children():
             self._tree.delete(*self._tree.get_children(item))
+        self._insert_categories()

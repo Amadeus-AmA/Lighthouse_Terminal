@@ -5,6 +5,12 @@ Lighthouse 基站串口控制台 — 基于 Python Tkinter 的图形化调试与
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Tkinter](https://img.shields.io/badge/GUI-Tkinter-orange)
 
+## 语言 / Language
+
+界面支持**中文 / English** 运行时切换：菜单栏 **语言 / Language** → 选择语言，立即生效，无需重启。
+
+Your choice is remembered in `%APPDATA%\LighthouseTerminal\config.json`(Windows) or `~/.lighthouse-terminal/config.json`. 设备命令、参数名和基站原始输出始终保留原样，不会因切换语言而改变。
+
 ## 下载
 
 **免安装 Windows 版**:前往 [Releases](https://github.com/Amadeus-AmA/Lighthouse_Terminal/releases/latest) 下载 `LighthouseTerminal.exe`,双击即用,无需安装 Python。
@@ -56,7 +62,7 @@ Lighthouse 基站串口控制台 — 基于 Python Tkinter 的图形化调试与
 - ISL58303 寄存器：下拉预设 21 个真机寄存器名，支持读取全部 / 单寄存器读写 / 自定义子命令
 - FPGA 激光通道状态：LASER_STATUS / LASER_CTRL / LASER_APC_GAIN / LASER_ON_DELAY / LASER_OFF_DELAY
 
-### 🔧 维护工具（视图 → 高级模式 勾选后显示）
+### 🔧 维护工具（高级功能 → 高级模式 勾选后显示）
 - **参数闪存分区**：`param part` 表格化显示 Par0/1（NORM）/ Par2（FACT）、CRC 状态（CRC-BAD 红色高亮）、版本号；保存到分区（修复）/ 从分区加载 / 擦除分区
 - **EEPROM 读取**：`eeprom r <地址> <长度>` 十六进制查看器（参数分区从 0x0000 开始，CPRM 魔数 + 版本 + CRC）
 - **基站电源**：`sys.standby` 休眠 / 唤醒一键切换，休眠后串口仍可用
