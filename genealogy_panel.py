@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 
+from i18n import tr_text, trf
+
 GENEALOGY_IDS = ["model", "top", "main", "upper", "antenna", "laser", "motor",
                  "chassis", "spare1", "spare2", "spare3"]
 
@@ -39,7 +41,7 @@ GENEALOGY_SLOTS = {
 
 
 def _display(gid: str) -> str:
-    return f"{gid} — {GENEALOGY_LABELS[gid]}"
+    return f"{gid} — {tr_text(GENEALOGY_LABELS[gid])}"
 
 
 class GenealogyPanel(tk.Frame):
@@ -47,12 +49,13 @@ class GenealogyPanel(tk.Frame):
         super().__init__(parent, **kwargs)
         self._serial = serial_manager
         self._writing = False
+        self._data = {}
 
-        header = ttk.Label(
+        self._header = ttk.Label(
             self, text="硬件溯源 — 设备各组件序列号与版本信息",
             font=("", 9, "bold"), foreground="#e5c07b"
         )
-        header.pack(anchor="w", padx=4, pady=(4, 2))
+        self._header.pack(anchor="w", padx=4, pady=(4, 2))
 
         # 底部编辑区先占位, 再让日志树占满剩余空间
         self._build_editor()
@@ -74,9 +77,27 @@ class GenealogyPanel(tk.Frame):
         self._tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
 
+        self._render_rows()
+
+    def set_language(self, language=None):
+        self._header.configure(text=tr_text("硬件溯源 — 设备各组件序列号与版本信息"))
+        self._tree.heading("#0", text=tr_text("溯源项"))
+        self._tree.heading("value", text=tr_text("信息"))
+        self._combo.configure(values=[_display(g) for g in GENEALOGY_IDS])
+        gid = self._gid_from_display(self._edit_field.get())
+        if gid:
+            self._edit_field.set(_display(gid))
+        self._render_rows()
+
+    def _render_rows(self):
+        for item in self._tree.get_children():
+            self._tree.delete(item)
         for key in GENEALOGY_IDS:
-            label = GENEALOGY_LABELS.get(key, key)
-            self._tree.insert("", tk.END, text=label, values=("--",))
+            label = tr_text(GENEALOGY_LABELS.get(key, key))
+            value = self._data.get(key, "--")
+            is_dim = value in ("- -", "-", "--") or set(value.split()) == {"-"}
+            tags = ("dim",) if is_dim else ()
+            self._tree.insert("", tk.END, iid=key, text=label, values=(value,), tags=tags)
 
     # ---------- 编辑区 ----------
 
@@ -89,9 +110,9 @@ class GenealogyPanel(tk.Frame):
 
         tk.Label(row, text="字段:").pack(side=tk.LEFT)
         self._edit_field = tk.StringVar(value=_display(GENEALOGY_IDS[0]))
-        combo = ttk.Combobox(row, textvariable=self._edit_field, state="readonly",
-                             width=28, values=[_display(g) for g in GENEALOGY_IDS])
-        combo.pack(side=tk.LEFT, padx=(4, 12))
+        self._combo = ttk.Combobox(row, textvariable=self._edit_field, state="readonly",
+                                   width=28, values=[_display(g) for g in GENEALOGY_IDS])
+        self._combo.pack(side=tk.LEFT, padx=(4, 12))
 
         tk.Label(row, text="序列号:").pack(side=tk.LEFT)
         self._edit_serial = tk.Entry(row, width=16, font=("Consolas", 9))
@@ -117,11 +138,9 @@ class GenealogyPanel(tk.Frame):
         sel = self._tree.selection()
         if not sel:
             return
-        label = self._tree.item(sel[0], "text")
-        for gid in GENEALOGY_IDS:
-            if GENEALOGY_LABELS[gid] == label:
-                self._edit_field.set(_display(gid))
-                return
+        gid = sel[0]
+        if gid in GENEALOGY_IDS:
+            self._edit_field.set(_display(gid))
 
     # ---------- 写入 ----------
 
@@ -129,7 +148,7 @@ class GenealogyPanel(tk.Frame):
         if self._writing:
             return
         if self._serial is None or not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         gid = self._gid_from_display(self._edit_field.get())
         serial = self._edit_serial.get().strip()
@@ -145,27 +164,25 @@ class GenealogyPanel(tk.Frame):
             data = " ".join(["00"] * size)
         else:
             if not serial or not part:
-                messagebox.showwarning("提示", "序列号和版本都要填写 (两栏都填 - 可清零恢复空置)")
+                messagebox.showwarning(tr_text("提示"), tr_text("序列号和版本都要填写 (两栏都填 - 可清零恢复空置)"))
                 return
             cmd = f"genealogy set {gid} {serial} {part}"
             data = None
 
         sensitive = gid in SENSITIVE_IDS
-        msg = f"即将执行:\n\n{cmd}\n"
-        if data:
-            msg += f"数据: {data}\n"
-        msg += "\n"
+        extra = ""
         if zero_fill:
-            msg += f"将把 {gid} 的槽位 (EEPROM 0x{addr:04X}, {size} 字节) 整体清零,\n恢复出厂空置显示。\n"
+            extra += trf("genealogy.zero_note", gid=gid, addr=addr, size=size)
         if sensitive:
-            msg += "该字段是设备身份信息, 修改会影响设备识别!\n"
-        msg += "\n确认写入?"
-        if not messagebox.askyesno("确认写入", msg,
+            extra += tr_text("该字段是设备身份信息, 修改会影响设备识别!\n")
+        body = trf("genealogy.write_body", cmd=cmd,
+                   data=(f"{tr_text('数据:')} {data}" if data else ""), extra=extra)
+        if not messagebox.askyesno(tr_text("确认写入"), body,
                                    icon="warning" if (sensitive or zero_fill) else "info"):
             return
 
         self._writing = True
-        self._edit_status.configure(text=f"正在写入 {gid} ...", fg="#7f8c8d")
+        self._edit_status.configure(text=trf("genealogy.writing", gid=gid), fg="#7f8c8d")
 
         def work():
             if zero_fill:
@@ -185,11 +202,11 @@ class GenealogyPanel(tk.Frame):
         if ok:
             self.load_from_text(lst)
         if ok:
-            prefix = "已清零" if zero_fill else "已执行"
+            prefix = tr_text("已清零") if zero_fill else tr_text("已执行")
             detail = f"{cmd}\n{data}" if data else cmd
             self._edit_status.configure(text=f"{prefix}: {detail}", fg="#27ae60")
         else:
-            self._edit_status.configure(text=f"写入可能失败 (设备回显: {resp.strip()[:60]})",
+            self._edit_status.configure(text=trf("genealogy.failed", response=resp.strip()[:60]),
                                         fg="#e74c3c")
 
     # ---------- 数据加载 ----------
@@ -198,16 +215,8 @@ class GenealogyPanel(tk.Frame):
         data = self._parse_genealogy(text)
         if not data:
             return
-
-        for item in self._tree.get_children():
-            self._tree.delete(item)
-
-        for key in GENEALOGY_IDS:
-            label = GENEALOGY_LABELS.get(key, key)
-            value = data.get(key, "--")
-            is_dim = value in ("- -", "-", "--") or set(value.split()) == {"-"}
-            tags = ("dim",) if is_dim else ()
-            self._tree.insert("", tk.END, text=label, values=(value,), tags=tags)
+        self._data = data
+        self._render_rows()
 
     @staticmethod
     def _parse_genealogy(text: str) -> dict:
@@ -220,8 +229,5 @@ class GenealogyPanel(tk.Frame):
         return result
 
     def clear(self):
-        for item in self._tree.get_children():
-            self._tree.delete(item)
-        for key in GENEALOGY_IDS:
-            label = GENEALOGY_LABELS.get(key, key)
-            self._tree.insert("", tk.END, text=label, values=("--",))
+        self._data = {}
+        self._render_rows()

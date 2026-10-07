@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 
+from i18n import tr_text
+
 STATE_PARAMS = [
     ("sys.emission_enable", "全局发射使能"),
     ("laser.enable", "激光使能"),
@@ -163,7 +165,7 @@ class LaserPanel(tk.Frame):
 
     def refresh(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
 
         def do_refresh():
@@ -206,7 +208,7 @@ class LaserPanel(tk.Frame):
 
     def _refresh_fpga(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
 
         def do_refresh():
@@ -244,8 +246,8 @@ class LaserPanel(tk.Frame):
 
     def _confirm_send(self, cmd: str, extra="") -> bool:
         return messagebox.askyesno(
-            "确认修改",
-            f"即将发送:\n\n{cmd}\n\n{extra}\n该操作会修改设备参数, 确认执行?",
+            tr_text("确认修改"),
+            f"{tr_text('即将发送:')}\n\n{cmd}\n\n{extra}\n{tr_text('该操作会修改设备参数, 确认执行?')}",
             icon="warning"
         )
 
@@ -266,7 +268,7 @@ class LaserPanel(tk.Frame):
 
     def _apply_bool(self, key: str):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         value = "true" if self._bool_vars[key].get() else "false"
         cmd = f"param set {key} {value}"
@@ -275,11 +277,11 @@ class LaserPanel(tk.Frame):
 
     def _apply_num(self, key: str):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         value = self._num_entries[key].get().strip()
         if not value:
-            messagebox.showwarning("提示", "请先输入参数值")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先输入参数值"))
             return
         cmd = f"param set {key} {value}"
         if self._confirm_send(cmd):
@@ -295,7 +297,7 @@ class LaserPanel(tk.Frame):
 
     def _check_connected(self) -> bool:
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return False
         return True
 
@@ -308,23 +310,23 @@ class LaserPanel(tk.Frame):
             return
         reg = self._reg_combo.get().strip()
         if not reg:
-            messagebox.showwarning("提示", "请选择或输入寄存器名称/地址")
+            messagebox.showwarning(tr_text("提示"), tr_text("请选择或输入寄存器名称/地址"))
             return
         self._send_and_show(f"isl58303 {reg}")
 
     def _isl_write(self):
         if not self._check_connected():
             return
-        reg = self._reg_entry.get().strip()
+        reg = self._reg_combo.get().strip()
         val = self._val_entry.get().strip()
         if not reg or not val:
-            messagebox.showwarning("提示", "请输入寄存器和要写入的值")
+            messagebox.showwarning(tr_text("提示"), tr_text("请输入寄存器和要写入的值"))
             return
         cmd = f"isl58303 {reg} {val}"
         if messagebox.askyesno(
-                "确认写入寄存器",
-                f"即将直接写入激光驱动芯片寄存器:\n\n{cmd}\n\n"
-                "错误取值可能导致激光器件永久损坏!\n确认写入?",
+                tr_text("确认写入寄存器"),
+                f"{tr_text('即将直接写入激光驱动芯片寄存器:')}\n\n{cmd}\n\n"
+                f"{tr_text('错误取值可能导致激光器件永久损坏!')}\n{tr_text('确认写入')}?",
                 icon="warning"):
             self._send_and_show(cmd)
 

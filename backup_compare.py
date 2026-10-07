@@ -14,6 +14,8 @@ else:
 
 BACKUP_DIR = os.path.join(_APP_DIR, "backup")
 
+from i18n import tr_text, trf
+
 
 def _ensure_backup_dir():
     os.makedirs(BACKUP_DIR, exist_ok=True)
@@ -22,16 +24,16 @@ def _ensure_backup_dir():
 def compare_params(parent_tk):
     file_a = filedialog.askopenfilename(
         parent=parent_tk,
-        title="选择第一份参数备份 (文件 A)",
-        filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")]
+        title=tr_text("选择第一份参数备份 (文件 A)"),
+        filetypes=[(tr_text("JSON 文件"), "*.json"), (tr_text("所有文件"), "*.*")]
     )
     if not file_a:
         return
 
     file_b = filedialog.askopenfilename(
         parent=parent_tk,
-        title="选择第二份参数备份 (文件 B)",
-        filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")]
+        title=tr_text("选择第二份参数备份 (文件 B)"),
+        filetypes=[(tr_text("JSON 文件"), "*.json"), (tr_text("所有文件"), "*.*")]
     )
     if not file_b:
         return
@@ -42,7 +44,7 @@ def compare_params(parent_tk):
         with open(file_b, "r", encoding="utf-8") as f:
             params_b = json.load(f)
     except Exception as e:
-        messagebox.showerror("加载失败", f"无法读取 JSON 文件:\n{e}")
+        messagebox.showerror(tr_text("加载失败"), trf("restore.failed", error=e))
         return
 
     all_keys = sorted(set(params_a.keys()) | set(params_b.keys()))
@@ -52,20 +54,20 @@ def compare_params(parent_tk):
     name_b = os.path.basename(file_b)
 
     window = tk.Toplevel(parent_tk)
-    window.title("参数备份对比")
+    window.title(tr_text("参数备份对比"))
     window.geometry("900x600")
 
     header = ttk.Label(
         window,
-        text=f"对比: {name_a}  vs  {name_b}",
+        text=trf("compare.header", a=name_a, b=name_b),
         font=("", 10, "bold")
     )
     header.pack(padx=8, pady=(8, 4))
 
     tree = ttk.Treeview(window, columns=("val_a", "val_b"), show="tree headings")
-    tree.heading("#0", text="参数名称")
-    tree.heading("val_a", text=f"文件 A: {name_a}")
-    tree.heading("val_b", text=f"文件 B: {name_b}")
+    tree.heading("#0", text=tr_text("参数名称"))
+    tree.heading("val_a", text=trf("compare.file_a", name=name_a))
+    tree.heading("val_b", text=trf("compare.file_b", name=name_b))
 
     tree.column("#0", width=260)
     tree.column("val_a", width=280, anchor="w")
@@ -92,7 +94,7 @@ def compare_params(parent_tk):
 
     summary = ttk.Label(
         window,
-        text=f"共 {len(all_keys)} 个参数，其中 {diff_count} 个差异",
+        text=trf("compare.summary", total=len(all_keys), diff=diff_count),
         font=("", 9)
     )
     summary.pack(padx=8, pady=(2, 8))
@@ -166,8 +168,8 @@ def _apply_params(serial_manager, params, keys, done_cb, summary_win):
 def restore_params_from_json(serial_manager, parent_tk):
     file_path = filedialog.askopenfilename(
         parent=parent_tk,
-        title="选择要恢复的参数备份",
-        filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")]
+        title=tr_text("选择要恢复的参数备份"),
+        filetypes=[(tr_text("JSON 文件"), "*.json"), (tr_text("所有文件"), "*.*")]
     )
     if not file_path:
         return
@@ -175,39 +177,39 @@ def restore_params_from_json(serial_manager, parent_tk):
         with open(file_path, "r", encoding="utf-8") as f:
             params = json.load(f)
     except Exception as e:
-        messagebox.showerror("加载失败", f"无法读取 JSON 文件:\n{e}")
+        messagebox.showerror(tr_text("加载失败"), trf("restore.failed", error=e))
         return
     if not isinstance(params, dict):
-        messagebox.showerror("加载失败", "备份文件格式不正确")
+        messagebox.showerror(tr_text("加载失败"), tr_text("备份文件格式不正确"))
         return
     skip = {"param", "list", "raw"}
     keys = [k for k in params if k not in skip and not k.startswith("_")]
     if not keys:
-        messagebox.showerror("加载失败", "备份文件中没有可恢复的参数")
+        messagebox.showerror(tr_text("加载失败"), tr_text("备份文件中没有可恢复的参数"))
         return
     if not messagebox.askyesno(
-            "确认恢复参数",
-            f"将向设备逐条写入 {len(keys)} 个参数, 最后执行 param save 保存到闪存。\n"
-            f"来源: {os.path.basename(file_path)}\n\n参数写错可能改变设备行为, 确认恢复?",
+            tr_text("确认恢复参数"),
+            trf("restore.confirm_body", count=len(keys), name=os.path.basename(file_path)),
             icon="warning"):
         return
 
     win = tk.Toplevel(parent_tk)
-    win.title("正在恢复参数")
+    win.title(trf("restore.win_params"))
     win.geometry("320x90")
-    tk.Label(win, text=f"正在写入参数 (0/{len(keys)})...").pack(pady=10)
+    tk.Label(win, text=trf("restore.writing", total=len(keys))).pack(pady=10)
     win.grab_set()
 
     def done(ok, fail, save_resp):
         win.destroy()
         if fail:
+            tail = save_resp.strip().splitlines()[-1] if save_resp.strip() else '(no response)'
             messagebox.showwarning(
-                "恢复完成(部分失败)",
-                f"成功 {ok} 项, 失败 {len(fail)} 项:\n"
-                + "\n".join(fail[:10]) + ("\n..." if len(fail) > 10 else "")
-                + f"\n\nparam save: {save_resp.strip().splitlines()[-1] if save_resp.strip() else '(无响应)'}")
+                trf("restore.done_partial"),
+                trf("restore.partial", ok=ok, len=len(fail),
+                    names="\n".join(fail[:10]) + ("\n..." if len(fail) > 10 else ""))
+                + f"\n\nparam save: {tail}")
         else:
-            messagebox.showinfo("恢复完成", f"已恢复 {ok} 个参数并保存到闪存")
+            messagebox.showinfo(trf("restore.done_title"), trf("restore.done", ok=ok))
 
     def work():
         _apply_params(serial_manager, params, keys, done, win)
@@ -228,22 +230,20 @@ def restore_fcal_to_device(serial_manager, parent_tk):
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
-        messagebox.showerror("加载失败", f"无法读取 JSON 文件:\n{e}")
+        messagebox.showerror(tr_text("加载失败"), trf("restore.failed", error=e))
         return
     keys = [k for k in data
             if k.startswith("fcal_") or k.startswith("fcal.")]
     if not keys:
-        messagebox.showerror("加载失败", "备份文件中没有 fcal 校准参数")
+        messagebox.showerror(tr_text("加载失败"), tr_text("备份文件中没有 fcal 校准参数"))
         return
     if not messagebox.askyesno(
-            "确认写入 FCAL 校准",
-            f"即将写入 {len(keys)} 项出厂校准参数并保存到闪存:\n{os.path.basename(file_path)}\n\n"
-            "FCAL 每台基站独一无二, 错误的校准值会导致定位失效!\n确认写入?",
+            tr_text("确认写入 FCAL 校准"),
+            trf("restore.fcal_confirm", count=len(keys), name=os.path.basename(file_path)),
             icon="warning"):
         return
-    if not messagebox.askyesno("二次确认", "再次确认: 确实要覆盖设备出厂校准?", icon="warning"):
+    if not messagebox.askyesno(tr_text("二次确认"), tr_text("再次确认: 确实要覆盖设备出厂校准?"), icon="warning"):
         return
-
     params = {k: data[k] for k in keys}
 
     def map_key(k):
@@ -254,18 +254,18 @@ def restore_fcal_to_device(serial_manager, parent_tk):
         return k
 
     win = tk.Toplevel(parent_tk)
-    win.title("正在写入 FCAL")
+    win.title(trf("restore.win_fcal"))
     win.geometry("320x90")
-    tk.Label(win, text="正在写入校准参数...").pack(pady=10)
+    tk.Label(win, text=trf("restore.fcal_writing")).pack(pady=10)
     win.grab_set()
 
     def done(ok, fail, save_resp):
         win.destroy()
         if fail:
-            messagebox.showwarning("写入完成(部分失败)",
-                                   f"成功 {ok} 项, 失败: {', '.join(fail)}")
+            messagebox.showwarning(trf("restore.save_done_partial"),
+                                   trf("restore.partial", ok=ok, len=len(fail), names=", ".join(fail)))
         else:
-            messagebox.showinfo("写入完成", f"已写入 {ok} 项 FCAL 校准并保存到闪存")
+            messagebox.showinfo(trf("restore.write_title"), trf("restore.fcal_done", ok=ok))
 
     def work():
         named = {map_key(k): params[k] for k in keys}

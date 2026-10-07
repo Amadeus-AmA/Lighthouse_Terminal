@@ -5,6 +5,7 @@ import time
 
 from backup_compare import restore_params_from_json, restore_fcal_to_device, BACKUP_DIR
 from journal_viewer import open_journal_viewer
+from i18n import tr_text, trf
 
 PARTITION_SLOTS = {0: 0x0000, 1: 0x0180, 2: 0x0300}
 PARTITION_SIZE = 0x180
@@ -19,11 +20,20 @@ class MaintenancePanel(tk.Frame):
     def __init__(self, parent, serial_manager, **kwargs):
         super().__init__(parent, **kwargs)
         self._serial = serial_manager
+        self._parts = []
         self._build_partition_area()
         self._build_eeprom_area()
         self._build_journal_area()
         self._build_power_area()
         self._build_restore_area()
+
+    def set_language(self, language=None):
+        self._tree.heading("index", text=tr_text("分区"))
+        self._tree.heading("type", text=tr_text("类型"))
+        self._tree.heading("addr", text=tr_text("地址"))
+        self._tree.heading("crc", text=tr_text("CRC 状态"))
+        self._tree.heading("version", text=tr_text("版本"))
+        self._render_parts()
 
     # ---------- 分区 ----------
 
@@ -43,7 +53,6 @@ class MaintenancePanel(tk.Frame):
             self._tree.column(col, width=width, anchor="w")
         self._tree.pack(fill=tk.X, padx=8, pady=(6, 2))
         self._tree.tag_configure("bad", foreground="#e74c3c")
-
         op_row = tk.Frame(part_frame)
         op_row.pack(fill=tk.X, padx=8, pady=(2, 4))
         tk.Label(op_row, text="分区:").pack(side=tk.LEFT)
@@ -60,7 +69,7 @@ class MaintenancePanel(tk.Frame):
 
     def _refresh_parts(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
 
         def work():
@@ -76,9 +85,13 @@ class MaintenancePanel(tk.Frame):
         parts = parse_param_part(text)
         if not parts:
             return
+        self._parts = parts
+        self._render_parts()
+
+    def _render_parts(self):
         for item in self._tree.get_children():
             self._tree.delete(item)
-        for p in parts:
+        for p in self._parts:
             self._tree.insert("", tk.END, values=(
                 f"Par{p['index']}", p["type"], p["address"],
                 "CRC-OK" if p["crc_ok"] else f"CRC-BAD ({p['crc_stored']}≠{p['crc_calc']})",
@@ -87,41 +100,41 @@ class MaintenancePanel(tk.Frame):
 
     def _save_partition(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         n = self._part_var.get()
         if messagebox.askyesno(
-                "确认保存分区",
-                f"将用当前参数执行: param save {n}\n该分区原有内容会被覆盖(修复)。确认?",
+                tr_text("确认保存分区"),
+                trf("maint.save_body", n=n),
                 icon="warning"):
-            self._send_async(f"param save {n}", f"已保存到分区 {n}")
+            self._send_async(f"param save {n}", trf("maint.saved", n=n))
 
     def _load_partition(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         n = self._part_var.get()
         if messagebox.askyesno(
-                "确认加载分区",
-                f"将执行: param load {n}\n当前内存中的参数会被分区内容覆盖。确认?",
+                tr_text("确认加载分区"),
+                trf("maint.load_body", n=n),
                 icon="warning"):
-            self._send_async(f"param load {n}", f"已从分区 {n} 加载")
+            self._send_async(f"param load {n}", trf("maint.loaded", n=n))
 
     def _erase_partition(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         n = self._part_var.get()
         if messagebox.askyesno(
-                "确认擦除分区",
-                f"将执行: param erase {n}\n该分区参数将全部丢失, 需重新校准/配置!\n确定要擦除分区 {n} ?",
+                tr_text("确认擦除分区"),
+                trf("maint.erase_body", n=n),
                 icon="warning"):
-            self._send_async(f"param erase {n}", f"已擦除分区 {n}")
+            self._send_async(f"param erase {n}", trf("maint.erased", n=n))
 
     def _send_async(self, cmd: str, done_msg: str):
         def work():
             resp = self._serial.send_command(cmd, wait_response=True, timeout=3.0)
-            self.after(0, lambda: messagebox.showinfo("完成", f"{done_msg}\n\n{resp.strip()[-200:]}"))
+            self.after(0, lambda: messagebox.showinfo(tr_text("完成"), f"{done_msg}\n\n{resp.strip()[-200:]}"))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -159,7 +172,7 @@ class MaintenancePanel(tk.Frame):
 
     def _eeprom_read(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         addr = self._ee_addr.get().strip() or "0x00"
         length = self._ee_len.get().strip() or "16"
@@ -178,7 +191,7 @@ class MaintenancePanel(tk.Frame):
 
     def _dump_range(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         addr_s = self._ee_addr.get().strip() or "0x00"
         len_s = self._ee_len.get().strip() or "16"
@@ -190,7 +203,7 @@ class MaintenancePanel(tk.Frame):
             def done():
                 self._ee_append(f">>> {cmd}\n{resp}\n")
                 if ":" not in resp:
-                    messagebox.showwarning("保存区间", "未获取到数据")
+                    messagebox.showwarning(tr_text("保存区间"), trf("maint.range_empty"))
                     return
                 import os
                 from datetime import datetime
@@ -199,7 +212,7 @@ class MaintenancePanel(tk.Frame):
                 path = os.path.join(BACKUP_DIR, name)
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(f"# {cmd}\n{resp}")
-                messagebox.showinfo("保存区间完成", f"已保存:\n{path}")
+                messagebox.showinfo(tr_text("保存区间完成"), trf("maint.range_saved", path=path))
 
             self.after(0, done)
 
@@ -207,7 +220,7 @@ class MaintenancePanel(tk.Frame):
 
     def _backup_partition(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         try:
             part_idx = int(self._part_var.get())
@@ -224,7 +237,7 @@ class MaintenancePanel(tk.Frame):
             def done():
                 self._ee_append(f">>> {cmd}\n{resp}\n")
                 if "0000000" not in resp and ":" not in resp:
-                    messagebox.showwarning("备份分区", f"未获取到分区 {part_idx} 数据")
+                    messagebox.showwarning(tr_text("备份分区"), trf("maint.part_empty", n=part_idx))
                     return
                 import os
                 from datetime import datetime
@@ -233,7 +246,7 @@ class MaintenancePanel(tk.Frame):
                                     f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(f"# {cmd}\n{resp}")
-                messagebox.showinfo("备份分区完成", f"分区 {part_idx} 原始数据已保存:\n{path}")
+                messagebox.showinfo(tr_text("备份分区完成"), trf("maint.partition_saved", n=part_idx, path=path))
             self.after(0, done)
 
         threading.Thread(target=work, daemon=True).start()
@@ -272,15 +285,15 @@ class MaintenancePanel(tk.Frame):
 
     def _standby(self, sleep: bool):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return
         cmd = f"param set sys.standby {'true' if sleep else 'false'}"
-        action = "休眠" if sleep else "唤醒"
+        action = trf("maint.sleep") if sleep else trf("maint.wake")
 
         def work():
             self._serial.send_command(cmd, wait_response=True, timeout=2.0)
             self.after(0, lambda: self._power_status.configure(
-                text=f"已发送{action}命令 ({time.strftime('%H:%M:%S')})"))
+                text=trf("maint.standby_sent", action=action, time=time.strftime('%H:%M:%S'))))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -302,7 +315,7 @@ class MaintenancePanel(tk.Frame):
 
     def _check_connected(self):
         if not self._serial.is_connected():
-            messagebox.showwarning("提示", "请先连接设备")
+            messagebox.showwarning(tr_text("提示"), tr_text("请先连接设备"))
             return False
         return True
 
@@ -318,9 +331,8 @@ class MaintenancePanel(tk.Frame):
         if not self._check_connected():
             return
         if messagebox.askyesno(
-                "确认进入 DFU",
-                "将发送 serial_dfu, 控制台会话随即关闭,\n"
-                "之后请用 nrfutil 在同一串口刷写无线电固件。\n确认进入?",
+                tr_text("确认进入 DFU"),
+                trf("maint.dfu_body"),
                 icon="warning"):
             def work():
                 self._serial.send_command("serial_dfu", wait_response=True, timeout=2.0)

@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import scrolledtext, ttk
 
+from i18n import tr_text
+
 
 class TerminalPanel(tk.Frame):
     def __init__(self, parent, on_command_callback=None, **kwargs):
@@ -74,7 +76,7 @@ class TerminalPanel(tk.Frame):
         self.append_output(f"[{text}]\n", "system")
 
     def append_error(self, text: str):
-        self.append_output(f"[错误] {text}\n", "error")
+        self.append_output(f"[{tr_text('错误')}] {text}\n", "error")
 
     def _on_send(self, event=None):
         cmd = self.cmd_entry.get().strip()
