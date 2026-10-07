@@ -11,6 +11,9 @@ if getattr(sys, "frozen", False):
     _APP_DIR = os.path.dirname(sys.executable)
 else:
     _APP_DIR = os.path.dirname(os.path.abspath(__file__))
+    # 源码布局: 代码在 src/ 下时, 备份保留在项目根目录(与历史备份一致)
+    if os.path.basename(_APP_DIR) == "src":
+        _APP_DIR = os.path.dirname(_APP_DIR)
 
 BACKUP_DIR = os.path.join(_APP_DIR, "backup")
 
