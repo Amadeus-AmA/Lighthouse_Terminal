@@ -126,6 +126,8 @@ lighthouse-terminal/
 ├── backup_compare.py        # 参数备份 JSON / 对比差异 / 一键备份 / 恢复到设备
 ├── laser_panel.py           # 激光控制面板（状态 / 开关 / ISL58303 寄存器）
 ├── maintenance_panel.py     # 维护工具面板（分区 / EEPROM / 休眠 / 恢复 / DFU）
+├── journal_viewer.py        # 履历日志查看器（journal 记录区解析）
+├── i18n.py                  # 中英双语资源与语言偏好管理
 ├── data_parser.py           # 命令输出解析器（18 个解析函数）
 ├── requirements.txt         # 依赖清单
 └── backup/                  # FCAL 备份输出目录（自动创建）
