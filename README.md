@@ -94,7 +94,7 @@ Your choice is remembered in `%APPDATA%\LighthouseTerminal\config.json`(Windows)
 git clone https://github.com/yourname/lighthouse-terminal.git
 cd lighthouse-terminal
 pip install -r requirements.txt
-python main.py
+python src/main.py
 ```
 
 ## 使用方法
@@ -112,25 +112,30 @@ python main.py
 
 ```
 lighthouse-terminal/
-├── main.py                  # 入口文件
-├── serial_manager.py        # 串口管理（扫描、连接、后台收发）
-├── gui_app.py               # 主窗口布局与模块集成
-├── terminal_panel.py        # 终端显示 + 命令输入 + Tab 补全
-├── status_panel.py          # 设备状态面板
-├── hardware_panel.py        # 硬件健康状态指示灯
-├── param_tree_panel.py      # 参数树 Tab（Treeview 前缀分组）
-├── fcal_viewer.py           # 出厂校准参数面板（Axis 0/1 对比）
-├── genealogy_panel.py       # 硬件溯源面板
-├── calibration_viewer.py    # Mode / PWM 校准图表（matplotlib）
-├── dump_viewer.py           # Dump 相位误差曲线图（20s 采集）
-├── backup_compare.py        # 参数备份 JSON / 对比差异 / 一键备份 / 恢复到设备
-├── laser_panel.py           # 激光控制面板（状态 / 开关 / ISL58303 寄存器）
-├── maintenance_panel.py     # 维护工具面板（分区 / EEPROM / 休眠 / 恢复 / DFU）
-├── journal_viewer.py        # 履历日志查看器（journal 记录区解析）
-├── i18n.py                  # 中英双语资源与语言偏好管理
-├── data_parser.py           # 命令输出解析器（18 个解析函数）
-├── requirements.txt         # 依赖清单
-└── backup/                  # FCAL 备份输出目录（自动创建）
+├── src/                      # 应用源码
+│   ├── main.py               # 入口文件
+│   ├── gui_app.py            # 主窗口布局与模块集成
+│   ├── serial_manager.py     # 串口管理（扫描、连接、后台收发）
+│   ├── terminal_panel.py     # 终端显示 + 命令输入 + Tab 补全
+│   ├── status_panel.py       # 设备状态面板
+│   ├── hardware_panel.py     # 硬件健康状态指示灯
+│   ├── param_tree_panel.py   # 参数树 Tab（Treeview 前缀分组）
+│   ├── fcal_viewer.py        # 出厂校准参数面板（Axis 0/1 对比）
+│   ├── genealogy_panel.py    # 硬件溯源面板（含字段编辑）
+│   ├── calibration_viewer.py # Mode / PWM 校准图表（matplotlib）
+│   ├── dump_viewer.py        # Dump 相位误差曲线图（20s 采集）
+│   ├── backup_compare.py     # 参数备份 JSON / 对比 / 一键备份 / 恢复
+│   ├── laser_panel.py        # 激光控制面板（状态 / 开关 / ISL58303 寄存器）
+│   ├── maintenance_panel.py  # 维护工具面板（分区 / EEPROM / 休眠 / 恢复 / DFU）
+│   ├── journal_viewer.py     # 履历日志查看器（journal 记录区解析）
+│   ├── log_panel.py          # 日志设置面板
+│   ├── data_parser.py        # 命令输出解析器（18 个解析函数）
+│   └── i18n.py               # 中英双语资源与语言偏好管理
+├── tools/                    # 开发辅助脚本（分区 dump 分析）
+├── images/                   # README 截图
+├── LighthouseTerminal.spec   # PyInstaller 打包配置
+├── requirements.txt          # 依赖清单
+└── backup/                   # 备份输出目录（自动创建，源码运行时位于项目根）
 ```
 
 ## 命令参考
