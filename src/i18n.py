@@ -335,7 +335,7 @@ TEXT_EN.update({
     "编辑参数": "Edit parameter", "新值": "New value", "写入": "Write",
     "同时保存到闪存 (param save)": "Also save to flash (param save)",
     "只读参数 (固件拒绝 param set)": "Read-only parameter (firmware rejects param set)",
-    "journal 数据保存在内部 flash 检查点, 串口无法修改。": "Journal data lives in the MCU internal flash checkpoint; not writable over serial.",
+    "该参数由固件保护, 无法通过串口修改。": "Protected by firmware; not writable over serial.",
     "值必须是数字": "Value must be numeric", "值必须是 true/false": "Value must be true/false",
     "超出类型范围": "Value out of range for type", "是": "Yes",
     "基线": "Baseline", "重设基线": "Re-baseline", "请先刷新参数值": "Refresh parameter values first",
