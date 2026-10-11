@@ -42,6 +42,7 @@ TRANSLATIONS = {
     "tab.genealogy": {"zh": "硬件溯源", "en": "Hardware genealogy"},
     "tab.dump": {"zh": "Dump 曲线", "en": "Dump chart"},
     "tab.logs": {"zh": "日志设置", "en": "Log settings"},
+    "tab.expert": {"zh": "参数专家", "en": "Param expert"},
     "quick.device": {"zh": "设备信息", "en": "Device info"},
     "quick.uptime": {"zh": "运行时间", "en": "Uptime"},
     "quick.freq": {"zh": "转子频率", "en": "Rotor frequency"},
@@ -327,6 +328,19 @@ TEXT_EN.update({
     "点击下方按钮开始采集 20 秒 Dump 数据\n采集期间请勿发送其他命令":
         "Click the button below to collect 20 s of Dump data\nDo not send other commands while collecting",
     "开始采集 Dump 数据": "Collect Dump data",
+    # param expert panel
+    "参数专家": "Param expert", "参数名": "Parameter", "类型": "Type",
+    "默认值": "Default", "未保存": "Unsaved", "描述": "Description", "搜索:": "Search:",
+    "刷新值": "Refresh values", "采集元数据": "Collect metadata", "保存到闪存": "Save to flash",
+    "编辑参数": "Edit parameter", "新值": "New value", "写入": "Write",
+    "同时保存到闪存 (param save)": "Also save to flash (param save)",
+    "只读参数 (固件拒绝 param set)": "Read-only parameter (firmware rejects param set)",
+    "journal 数据保存在内部 flash 检查点, 串口无法修改。": "Journal data lives in the MCU internal flash checkpoint; not writable over serial.",
+    "值必须是数字": "Value must be numeric", "值必须是 true/false": "Value must be true/false",
+    "超出类型范围": "Value out of range for type", "是": "Yes",
+    "expert.collecting": {"zh": "正在采集元数据 {i}/{total} ...", "en": "Collecting metadata {i}/{total} ..."},
+    "expert.collected_done": {"zh": "元数据采集完成: {count} 个参数", "en": "Metadata collected: {count} parameters"},
+    "expert.values_loaded": {"zh": "已加载 {count} 个参数值", "en": "Loaded {count} parameter values"},
     # menus
     "文件": "File", "高级功能": "Advanced", "工具": "Tools", "退出": "Exit",
     "高级模式（显示维护工具）": "Advanced mode (show maintenance tools)",
