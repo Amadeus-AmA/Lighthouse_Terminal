@@ -46,3 +46,6 @@ dumps/
 # 按设备固化的参数基线与元数据覆盖(含设备数据)
 baselines/
 param_meta_override.json
+
+# 串口直连探针(仅本地自用, 不入库)
+tools/serial_cli.py
