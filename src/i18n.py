@@ -375,6 +375,21 @@ TRANSLATIONS.update({
         "zh": "将用当前值覆盖基站 {sn} 的固化基线 ({count} 个参数)。\n此后的差异对比将以新基线为准。确认重设?",
         "en": "Overwrite the fixed baseline of station {sn} with current values ({count} parameters).\nFuture diffs will be against this new baseline. Continue?"},
     "expert.baseline_reset": {"zh": "基线已重设 (SN {sn})", "en": "Baseline reset (SN {sn})"},
+    "journal.checking": {
+        "zh": "履历校验: 正在读取...",
+        "en": "History check: reading..."},
+    "journal.check_skip": {
+        "zh": "履历校验: 未取得序列号或计数, 本次跳过",
+        "en": "History check: skipped (serial/counters unavailable)"},
+    "journal.verdict_ok": {
+        "zh": "履历校验通过",
+        "en": "History check passed"},
+    "journal.verdict_fail": {
+        "zh": "履历校验未通过 ({codes})",
+        "en": "History check failed ({codes})"},
+    "journal.cur_unreadable": {
+        "zh": "履历校验: 数据读取异常",
+        "en": "History check: read error"},
     "expert.collecting": {"zh": "正在采集元数据 {i}/{total} ...", "en": "Collecting metadata {i}/{total} ..."},
     "expert.collected_done": {"zh": "元数据采集完成: {count} 个参数", "en": "Metadata collected: {count} parameters"},
     "expert.values_loaded": {"zh": "已加载 {count} 个参数值", "en": "Loaded {count} parameter values"},

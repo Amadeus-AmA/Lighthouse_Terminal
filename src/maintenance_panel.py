@@ -17,9 +17,10 @@ PARTITION_HELP = (
 
 
 class MaintenancePanel(tk.Frame):
-    def __init__(self, parent, serial_manager, **kwargs):
+    def __init__(self, parent, serial_manager, device_id_provider=None, **kwargs):
         super().__init__(parent, **kwargs)
         self._serial = serial_manager
+        self._device_id_provider = device_id_provider
         self._parts = []
         self._build_partition_area()
         self._build_eeprom_area()
@@ -260,7 +261,7 @@ class MaintenancePanel(tk.Frame):
         row = tk.Frame(jf)
         row.pack(fill=tk.X, padx=8, pady=6)
         ttk.Button(row, text="扫描并查看履历日志",
-                   command=lambda: open_journal_viewer(self, self._serial)).pack(side=tk.LEFT)
+                   command=lambda: open_journal_viewer(self, self._serial, self._device_id_provider)).pack(side=tk.LEFT)
 
         tk.Label(jf, text="每次开关机都会留下一组 boots/locks/faults/spins/sweeps 快照, "
                           "可核查设备的真实使用与断电历史。",
