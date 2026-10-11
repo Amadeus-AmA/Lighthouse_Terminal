@@ -362,7 +362,9 @@ class LighthouseConsoleApp:
         self._notebook.add(param_tab, text="参数树")
 
         expert_tab = tk.Frame(self._notebook)
-        self._param_expert = ParamExpertPanel(expert_tab, self._serial)
+        self._param_expert = ParamExpertPanel(
+            expert_tab, self._serial,
+            device_id_provider=lambda: self._device_info.get("serial_number", ""))
         self._param_expert.pack(fill=tk.BOTH, expand=True)
         self._notebook.add(expert_tab, text="参数专家")
 
@@ -383,7 +385,10 @@ class LighthouseConsoleApp:
 
         self._laser_tab = laser_tab
         self._maint_tab = maint_tab
+        self._expert_tab = expert_tab
+        self._param_tab = param_tab
         self._notebook.forget(maint_tab)
+        self._notebook.forget(expert_tab)
 
         genealogy_tab = tk.Frame(self._notebook)
         self._genealogy_panel = GenealogyPanel(genealogy_tab, self._serial)
@@ -585,8 +590,11 @@ class LighthouseConsoleApp:
         if self._advanced_var.get() and not managed:
             pos = self._notebook.index(self._laser_tab) + 1
             self._notebook.insert(pos, self._maint_tab, text=self._t("tab.maintenance"))
+            pos_e = self._notebook.index(self._param_tab) + 1
+            self._notebook.insert(pos_e, self._expert_tab, text=self._t("tab.expert"))
         elif not self._advanced_var.get() and managed:
             self._notebook.forget(self._maint_tab)
+            self._notebook.forget(self._expert_tab)
 
     def _backup_all(self):
         if not self._serial.is_connected():

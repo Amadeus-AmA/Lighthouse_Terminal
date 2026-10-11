@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -30,14 +31,22 @@ def _app_dir():
     return os.path.dirname(d) if os.path.basename(d) == "src" else d
 
 
+def _baseline_path(serial_id: str):
+    # 每台基站(按序列号)一份固化基线, 互不干扰
+    return os.path.join(_app_dir(), "baselines", f"{serial_id}.json")
+
+
 class ParamExpertPanel(tk.Frame):
-    def __init__(self, parent, serial_manager, **kwargs):
+    def __init__(self, parent, serial_manager, device_id_provider=None, **kwargs):
         super().__init__(parent, **kwargs)
         self._serial = serial_manager
+        self._device_id_provider = device_id_provider
         self._sweeping = False
         self._meta = self._load_meta()
         self._values = {}
         self._unsaved = set()
+        self._baseline = None
+        self._baseline_serial = None
 
         bar = tk.Frame(self)
         bar.pack(fill=tk.X, padx=4, pady=(4, 2))
@@ -62,23 +71,25 @@ class ParamExpertPanel(tk.Frame):
         self._collect_btn.pack(side=tk.LEFT, padx=(0, 6))
         self._save_btn = ttk.Button(bar, text="保存到闪存",
                                     command=lambda: self._send("param save"))
-        self._save_btn.pack(side=tk.LEFT)
+        self._save_btn.pack(side=tk.LEFT, padx=(0, 6))
+        self._baseline_btn = ttk.Button(bar, text="重设基线", command=self._recapture_baseline)
+        self._baseline_btn.pack(side=tk.LEFT)
 
         self._status = tk.Label(self, text="", fg="#7f8c8d", anchor="w")
         self._status.pack(fill=tk.X, padx=6)
 
-        cols = ("type", "value", "default", "unsaved", "desc")
+        cols = ("type", "value", "baseline", "unsaved", "desc")
         self._tree = ttk.Treeview(self, columns=cols, show="tree headings")
         self._tree.heading("#0", text="参数名")
         self._tree.heading("type", text="类型")
         self._tree.heading("value", text="当前值")
-        self._tree.heading("default", text="默认值")
+        self._tree.heading("baseline", text="基线")
         self._tree.heading("unsaved", text="未保存")
         self._tree.heading("desc", text="描述")
         self._tree.column("#0", width=230)
         self._tree.column("type", width=90, anchor="w")
         self._tree.column("value", width=130, anchor="w")
-        self._tree.column("default", width=110, anchor="w")
+        self._tree.column("baseline", width=130, anchor="w")
         self._tree.column("unsaved", width=60, anchor="center")
         self._tree.column("desc", width=190, anchor="w")
 
@@ -171,8 +182,76 @@ class ParamExpertPanel(tk.Frame):
             return
         from data_parser import parse_param_list
         self._values = parse_param_list(resp)
+        self._ensure_baseline(self._values)
         self._status.configure(text=trf("expert.values_loaded", count=len(self._values)),
                                fg="#7f8c8d")
+        self._render()
+
+    # ---------- 基线 (按设备序列号固化, 不随后续修改/换机而变) ----------
+
+    def _baseline_file(self):
+        get_id = self._device_id_provider
+        serial_id = get_id() if get_id else ""
+        if not serial_id:
+            return None
+        return _baseline_path(serial_id)
+
+    def _ensure_baseline(self, values):
+        """首次从某台基站采集参数时固化基线; 之后不再改动, 除非显式重设。"""
+        path = self._baseline_file()
+        if not path:
+            self._baseline = None
+            self._baseline_serial = None
+            return
+        serial_id = os.path.splitext(os.path.basename(path))[0]
+        if self._baseline_serial == serial_id and self._baseline is not None:
+            return  # 已有本会话基线
+        try:
+            data = json.loads(open(path, encoding="utf-8").read())
+            self._baseline = data.get("values", {})
+            self._baseline_serial = serial_id
+            return
+        except (OSError, ValueError):
+            pass
+        # 首次采集: 以当前值固化
+        self._baseline = dict(values)
+        self._baseline_serial = serial_id
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"serial": serial_id,
+                           "captured": time.strftime("%Y-%m-%d %H:%M:%S"),
+                           "values": self._baseline},
+                          f, ensure_ascii=False, indent=1)
+        except OSError:
+            pass
+
+    def _recapture_baseline(self):
+        if not self._values:
+            messagebox.showwarning(tr_text("提示"), tr_text("请先刷新参数值"))
+            return
+        path = self._baseline_file()
+        if not path:
+            messagebox.showwarning(tr_text("提示"), tr_text("未识别到设备序列号"))
+            return
+        serial_id = os.path.splitext(os.path.basename(path))[0]
+        if not messagebox.askyesno(
+                tr_text("重设基线"),
+                trf("expert.recapture_body", sn=serial_id, count=len(self._values)),
+                icon="warning"):
+            return
+        self._baseline = dict(self._values)
+        self._baseline_serial = serial_id
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"serial": serial_id,
+                           "captured": time.strftime("%Y-%m-%d %H:%M:%S"),
+                           "values": self._baseline},
+                          f, ensure_ascii=False, indent=1)
+        except OSError:
+            pass
+        self._status.configure(text=trf("expert.baseline_reset", sn=serial_id), fg="#27ae60")
         self._render()
 
     # ---------- 渲染 ----------
@@ -189,17 +268,17 @@ class ParamExpertPanel(tk.Frame):
             if type_filter and meta.get("type") != type_filter:
                 continue
             value = str(self._values.get(name, "--"))
-            default = str(meta.get("default", ""))
+            baseline = str(self._baseline.get(name, "--")) if self._baseline else "--"
             unsaved = tr_text("是") if name in self._unsaved else ""
             tags = []
             if name in self._unsaved:
                 tags.append("unsaved")
             if name.startswith("journal."):
                 tags.append("readonly")
-            if value != default and self._values:
+            if self._baseline and value != baseline and value != "--":
                 tags.append("diff")
             self._tree.insert("", tk.END, iid=name, text=name,
-                              values=(meta.get("type", ""), value, default,
+                              values=(meta.get("type", ""), value, baseline,
                                       unsaved, meta.get("description", "")),
                               tags=tuple(tags))
 
@@ -207,12 +286,13 @@ class ParamExpertPanel(tk.Frame):
         self._tree.heading("#0", text=tr_text("参数名"))
         self._tree.heading("type", text=tr_text("类型"))
         self._tree.heading("value", text=tr_text("当前值"))
-        self._tree.heading("default", text=tr_text("默认值"))
+        self._tree.heading("baseline", text=tr_text("基线"))
         self._tree.heading("unsaved", text=tr_text("未保存"))
         self._tree.heading("desc", text=tr_text("描述"))
         self._refresh_btn.configure(text=tr_text("刷新值"))
         self._collect_btn.configure(text=tr_text("采集元数据"))
         self._save_btn.configure(text=tr_text("保存到闪存"))
+        self._baseline_btn.configure(text=tr_text("重设基线"))
         self._render()
 
     # ---------- 编辑 ----------

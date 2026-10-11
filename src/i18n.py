@@ -338,9 +338,8 @@ TEXT_EN.update({
     "journal 数据保存在内部 flash 检查点, 串口无法修改。": "Journal data lives in the MCU internal flash checkpoint; not writable over serial.",
     "值必须是数字": "Value must be numeric", "值必须是 true/false": "Value must be true/false",
     "超出类型范围": "Value out of range for type", "是": "Yes",
-    "expert.collecting": {"zh": "正在采集元数据 {i}/{total} ...", "en": "Collecting metadata {i}/{total} ..."},
-    "expert.collected_done": {"zh": "元数据采集完成: {count} 个参数", "en": "Metadata collected: {count} parameters"},
-    "expert.values_loaded": {"zh": "已加载 {count} 个参数值", "en": "Loaded {count} parameter values"},
+    "基线": "Baseline", "重设基线": "Re-baseline", "请先刷新参数值": "Refresh parameter values first",
+    "未识别到设备序列号": "Device serial not identified yet",
     # menus
     "文件": "File", "高级功能": "Advanced", "工具": "Tools", "退出": "Exit",
     "高级模式（显示维护工具）": "Advanced mode (show maintenance tools)",
@@ -372,6 +371,13 @@ TRANSLATIONS.update({
     "maint.wake": {"zh": "唤醒", "en": "Wake"},
     "maint.range_empty": {"zh": "未获取到数据", "en": "No data received"},
     "maint.part_empty": {"zh": "未获取到分区 {n} 数据", "en": "No data received for partition {n}"},
+    "expert.recapture_body": {
+        "zh": "将用当前值覆盖基站 {sn} 的固化基线 ({count} 个参数)。\n此后的差异对比将以新基线为准。确认重设?",
+        "en": "Overwrite the fixed baseline of station {sn} with current values ({count} parameters).\nFuture diffs will be against this new baseline. Continue?"},
+    "expert.baseline_reset": {"zh": "基线已重设 (SN {sn})", "en": "Baseline reset (SN {sn})"},
+    "expert.collecting": {"zh": "正在采集元数据 {i}/{total} ...", "en": "Collecting metadata {i}/{total} ..."},
+    "expert.collected_done": {"zh": "元数据采集完成: {count} 个参数", "en": "Metadata collected: {count} parameters"},
+    "expert.values_loaded": {"zh": "已加载 {count} 个参数值", "en": "Loaded {count} parameter values"},
     "genealogy.write_body": {
         "zh": "即将执行:\n\n{cmd}\n{data}\n{extra}\n确认写入?",
         "en": "About to run:\n\n{cmd}\n{data}\n{extra}\nConfirm write?"},
