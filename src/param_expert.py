@@ -309,7 +309,7 @@ class ParamExpertPanel(tk.Frame):
             messagebox.showinfo(
                 tr_text("提示"),
                 tr_text("只读参数 (固件拒绝 param set)") + f"\n{name}\n\n"
-                + tr_text("journal 数据保存在内部 flash 检查点, 串口无法修改。"))
+                + tr_text("该参数由固件保护, 无法通过串口修改。"))
             return
         current = str(self._values.get(name, meta.get("default", "")))
         self._open_editor(name, meta, current)
