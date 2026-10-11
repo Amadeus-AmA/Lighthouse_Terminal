@@ -42,3 +42,7 @@ config.local.py
 *.zip
 .zcode/
 dumps/
+
+# 按设备固化的参数基线与元数据覆盖(含设备数据)
+baselines/
+param_meta_override.json
