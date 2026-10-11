@@ -129,9 +129,10 @@ lighthouse-terminal/
 │   ├── maintenance_panel.py  # 维护工具面板（分区 / EEPROM / 休眠 / 恢复 / DFU）
 │   ├── journal_viewer.py     # 履历日志查看器（journal 记录区解析）
 │   ├── log_panel.py          # 日志设置面板
+│   ├── param_expert.py       # 参数专家面板（121 参数元数据 / 类型安全编辑）
+│   ├── param_meta.py         # 固件参数元数据（param info 采集）
 │   ├── data_parser.py        # 命令输出解析器（18 个解析函数）
 │   └── i18n.py               # 中英双语资源与语言偏好管理
-├── tools/                    # 开发辅助脚本（分区 dump 分析）
 ├── images/                   # README 截图
 ├── LighthouseTerminal.spec   # PyInstaller 打包配置
 ├── requirements.txt          # 依赖清单
