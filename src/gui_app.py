@@ -6,6 +6,7 @@ from serial_manager import SerialManager
 from terminal_panel import TerminalPanel
 from status_panel import StatusPanel
 from param_tree_panel import ParamTreePanel
+from param_expert import ParamExpertPanel
 from fcal_viewer import FcalViewer
 from calibration_viewer import CalibrationViewer
 from hardware_panel import HardwarePanel
@@ -240,7 +241,7 @@ class LighthouseConsoleApp:
         self._menubar.entryconfigure(self._language_cascade_index, label=self._t("menu.language"))
         self._language_var.set(language)
 
-        tab_keys = ["tab.terminal", "tab.params", "tab.fcal", "tab.laser",
+        tab_keys = ["tab.terminal", "tab.params", "tab.expert", "tab.fcal", "tab.laser",
                     "tab.maintenance", "tab.genealogy", "tab.dump", "tab.logs"]
         current_tabs = set(self._notebook.tabs())
         for frame, key in zip(self._tab_frames, tab_keys):
@@ -250,8 +251,9 @@ class LighthouseConsoleApp:
         self._status_label.configure(text=(self._t("toolbar.connected", port=self._current_port)
                                            if self._serial.is_connected() else self._t("toolbar.not_connected")))
         for panel in (self._terminal, self._status_panel, self._hardware_panel,
-                      self._param_tree, self._fcal_viewer, self._laser_panel,
-                      self._maintenance_panel, self._genealogy_panel, self._log_panel):
+                      self._param_tree, self._param_expert, self._fcal_viewer,
+                      self._laser_panel, self._maintenance_panel,
+                      self._genealogy_panel, self._log_panel):
             setter = getattr(panel, "set_language", None)
             if setter:
                 setter(language)
@@ -359,6 +361,11 @@ class LighthouseConsoleApp:
         self._param_tree.pack(fill=tk.BOTH, expand=True)
         self._notebook.add(param_tab, text="参数树")
 
+        expert_tab = tk.Frame(self._notebook)
+        self._param_expert = ParamExpertPanel(expert_tab, self._serial)
+        self._param_expert.pack(fill=tk.BOTH, expand=True)
+        self._notebook.add(expert_tab, text="参数专家")
+
         fcal_tab = tk.Frame(self._notebook)
         self._fcal_viewer = FcalViewer(fcal_tab)
         self._fcal_viewer.pack(fill=tk.BOTH, expand=True)
@@ -397,7 +404,7 @@ class LighthouseConsoleApp:
         self._notebook.add(log_tab, text="日志设置")
 
         self._log_tab = log_tab
-        self._tab_frames = [terminal_tab, param_tab, fcal_tab, laser_tab,
+        self._tab_frames = [terminal_tab, param_tab, expert_tab, fcal_tab, laser_tab,
                             maint_tab, genealogy_tab, dump_tab, log_tab]
 
         self._notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
