@@ -21,7 +21,7 @@ from data_parser import (
     parse_param_uptime, parse_sys_config, parse_journal,
     parse_isl58303, parse_fpga, parse_genealogy_list
 )
-from i18n import Translator, apply_widget_language, set_current_language, tr_text, current_language
+from i18n import Translator, apply_widget_language, set_current_language, tr_text, trf, current_language
 
 COMMAND_REFERENCE_EN = """=== Lighthouse base station command reference ===
 
@@ -379,7 +379,9 @@ class LighthouseConsoleApp:
         self._notebook.add(laser_tab, text="激光控制")
 
         maint_tab = tk.Frame(self._notebook)
-        self._maintenance_panel = MaintenancePanel(maint_tab, self._serial)
+        self._maintenance_panel = MaintenancePanel(
+            maint_tab, self._serial,
+            device_id_provider=lambda: self._device_info.get("serial_number", ""))
         self._maintenance_panel.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
         self._notebook.add(maint_tab, text="维护工具")
 
@@ -550,7 +552,42 @@ class LighthouseConsoleApp:
             if genealogy_resp:
                 self.root.after(0, lambda: self._genealogy_panel.load_from_text(genealogy_resp))
 
+            # 履历检查 (串口已空闲, 排在轮询之后)
+            self.root.after(0, lambda: self._run_history_check(journal_info))
+
         threading.Thread(target=poll, daemon=True).start()
+
+    def _run_history_check(self, journal_info):
+        cur_boots = journal_info.get("journal_boots")
+        cur_faults = journal_info.get("journal_faults")
+        cur_life = journal_info.get("journal_life")
+        serial_id = self._device_info.get("serial_number", "")
+        if cur_boots is None or not serial_id:
+            self._status_panel.set_journal_verdict(trf("journal.check_skip"), "#7f8c8d")
+            return
+        self._status_panel.set_journal_verdict(trf("journal.checking"), "#7f8c8d")
+
+        def work():
+            from journal_viewer import (
+                _parse_hexdump, _extract_records,
+                load_store, update_store, analyze_consistency,
+                LOG_BASE, READ_LEN,
+            )
+            resp = self._serial.send_command(f"eeprom r 0x{LOG_BASE:X} {READ_LEN}",
+                                             wait_response=True, timeout=20.0)
+            recs = []
+            if resp and ":" in resp:
+                recs = _extract_records(_parse_hexdump(resp))
+            st = load_store(serial_id)
+            codes = analyze_consistency(recs, cur_boots, cur_faults, cur_life, st)
+            if codes:
+                text, color = trf("journal.verdict_fail", codes=" ".join(codes)), "#e74c3c"
+            else:
+                text, color = trf("journal.verdict_ok"), "#27ae60"
+            update_store(serial_id, recs, cur_boots, cur_faults, cur_life)
+            self.root.after(0, lambda: self._status_panel.set_journal_verdict(text, color))
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _on_data_received(self, text: str):
         self.root.after(0, self._terminal.append_received, text)

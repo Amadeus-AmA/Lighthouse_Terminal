@@ -1,21 +1,20 @@
-"""履历日志查看器 — 解析 EEPROM journal 记录区 (0x554-0xFC0)
-
-记录 48 字节/条, 地址 ≡ 0x14 (mod 0x30):
-  +0x00 累计运行秒 (journal.life 高 32 位)   +0x04 boots   +0x08 locks
-  +0x0C spins   +0x14 sweeps   +0x1C faults   +0x24 nonce   +0x2C 尾部校验字
-固件在每次开关机时成批写入 3-4 条冗余记录, 位置由磨损均衡决定。
-"""
+"""履历记录查看器 (0x554-0xFC0)"""
+import json
+import os
 import re
 import struct
+import sys
+import threading
+import time
 import tkinter as tk
 from tkinter import ttk
-import threading
 
-from i18n import tr_text, trf, TRANSLATIONS
+from i18n import tr_text, trf
 
 LOG_BASE = 0x554
 LOG_TOP = 0xFC0
 READ_LEN = LOG_TOP - LOG_BASE  # 2668
+BOOTS_TOLERANCE = 5
 
 
 def _parse_hexdump(text: str) -> bytes:
@@ -50,14 +49,83 @@ def _extract_records(buf: bytes) -> list:
     return recs
 
 
-def open_journal_viewer(parent, serial_manager):
+# ---------- 校验 ----------
+
+def _store_path(serial_id: str):
+    if getattr(sys, "frozen", False):
+        base = os.path.dirname(sys.executable)
+    else:
+        d = os.path.dirname(os.path.abspath(__file__))
+        base = os.path.dirname(d) if os.path.basename(d) == "src" else d
+    return os.path.join(base, ".lht", f"{serial_id}.json")
+
+
+def load_store(serial_id: str) -> dict:
+    if not serial_id:
+        return {}
+    try:
+        return json.loads(open(_store_path(serial_id), encoding="utf-8").read())
+    except (OSError, ValueError):
+        return {}
+
+
+def save_store(serial_id: str, data: dict) -> None:
+    if not serial_id:
+        return
+    path = _store_path(serial_id)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        data["t"] = time.strftime("%y%m%d%H%M")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=0)
+    except OSError:
+        pass
+
+
+def analyze_consistency(recs: list, cb: int, cf: int, cl: int, st: dict) -> list:
+    out = []
+    mb = max((r['boots'] for r in recs), default=0)
+    mf = max((r['faults'] for r in recs), default=0)
+    ml = max((r['life'] for r in recs), default=0)
+    lb = st.get('b', 0)
+    lf = st.get('f', 0)
+    ll = st.get('l', 0)
+    if recs and cb < mb:
+        out.append('E1')
+    if recs and cf < mf:
+        out.append('E2')
+    if recs and cl < ml:
+        out.append('E3')
+    if not recs and (cb > 10 or lb > 10):
+        out.append('E4')
+    if lb and cb < lb:
+        out.append('E5')
+    if ll and cl < ll:
+        out.append('E6')
+    if recs and cb > mb + BOOTS_TOLERANCE:
+        out.append('E7')
+    return out
+
+
+def update_store(serial_id: str, recs: list, cb: int, cf: int, cl: int) -> dict:
+    st = load_store(serial_id)
+    st['b'] = max(st.get('b', 0), cb, max((r['boots'] for r in recs), default=0))
+    st['f'] = max(st.get('f', 0), cf, max((r['faults'] for r in recs), default=0))
+    st['l'] = max(st.get('l', 0), cl, max((r['life'] for r in recs), default=0))
+    save_store(serial_id, st)
+    return st
+
+
+def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     win = tk.Toplevel(parent)
     win.title(tr_text("履历日志查看器 (journal 记录区 0x554-0xFC0)"))
-    win.geometry("1020x600")
+    win.geometry("1020x640")
 
-    info = tk.Label(win, text=trf("journal.reading"),
-                    fg="#7f8c8d", anchor="w")
-    info.pack(fill=tk.X, padx=8, pady=(6, 2))
+    verdict = tk.Label(win, text="", anchor="w", font=("", 9, "bold"), justify=tk.LEFT)
+    verdict.pack(fill=tk.X, padx=8, pady=(6, 0))
+
+    info = tk.Label(win, text=trf("journal.reading"), fg="#7f8c8d", anchor="w")
+    info.pack(fill=tk.X, padx=8, pady=(2, 2))
 
     cols = ("addr", "life", "boots", "locks", "faults", "spins", "sweeps")
     tree = ttk.Treeview(win, columns=cols, show="headings")
@@ -82,8 +150,17 @@ def open_journal_viewer(parent, serial_manager):
     summary.pack(fill=tk.X, padx=8, pady=(2, 6))
 
     def work():
+        # 1) 日志区
         cmd = f"eeprom r 0x{LOG_BASE:X} {READ_LEN}"
         resp = serial_manager.send_command(cmd, wait_response=True, timeout=20.0)
+        # 2) 当前参数计数
+        cur = {}
+        for key in ("journal.boots", "journal.faults", "journal.life"):
+            r = serial_manager.send_command(f"param get {key}",
+                                            wait_response=True, timeout=2.0)
+            for line in r.splitlines():
+                if line.strip().startswith(key):
+                    cur[key] = line.strip().split()[1]
 
         def done():
             if ":" not in resp:
@@ -106,6 +183,25 @@ def open_journal_viewer(parent, serial_manager):
                                            hours=hi['life'] / 3600))
             else:
                 summary.configure(text=tr_text("未识别到有效记录"))
+
+            # 3) 校验
+            try:
+                cb = int(cur.get("journal.boots", 0))
+                cf = int(cur.get("journal.faults", 0))
+                cl = int(cur.get("journal.life", 0))
+            except ValueError:
+                verdict.configure(text=tr_text("journal.cur_unreadable"), fg="#e67e22")
+                return
+            sid = device_id_provider() if device_id_provider else ""
+            st = load_store(sid)
+            codes = analyze_consistency(recs, cb, cf, cl, st)
+            if codes:
+                verdict.configure(text=trf("journal.verdict_fail", codes=" ".join(codes)),
+                                  fg="#e74c3c")
+            else:
+                verdict.configure(text=trf("journal.verdict_ok"), fg="#27ae60")
+            if sid:
+                update_store(sid, recs, cb, cf, cl)
 
         win.after(0, done)
 

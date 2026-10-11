@@ -48,6 +48,13 @@ class StatusPanel(tk.LabelFrame):
         self._add_field("journal_faults", "历史故障次数")
         self._add_field("journal_life", "累计运行滴答")
 
+        # 履历检查结论 (连接后自动更新)
+        self._journal_verdict = tk.Label(self, text="", fg="#7f8c8d",
+                                         anchor="w", justify=tk.LEFT, wraplength=330)
+        self._journal_verdict.grid(row=self._row, column=0, columnspan=2,
+                                   sticky="w", padx=(4, 2), pady=(2, 2))
+        self._row += 1
+
     def _add_section(self, title: str):
         lbl = ttk.Label(self, text=title, font=("", 9, "bold"))
         lbl.grid(row=self._row, column=0, columnspan=2, sticky="w", pady=(6, 2), padx=4)
@@ -100,6 +107,10 @@ class StatusPanel(tk.LabelFrame):
                 val = fmt(val)
             self.update_field(ui_key, val)
 
+    def set_journal_verdict(self, text: str, color: str):
+        self._journal_verdict.configure(text=text, fg=color)
+
     def clear_all(self):
         for key in self._labels:
             self._labels[key].configure(text="--")
+        self._journal_verdict.configure(text="", fg="#7f8c8d")
