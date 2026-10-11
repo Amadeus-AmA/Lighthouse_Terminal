@@ -41,3 +41,4 @@ config.local.py
 # 发布产物与 agent 本地目录
 *.zip
 .zcode/
+dumps/
