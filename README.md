@@ -30,6 +30,7 @@ Your choice is remembered in `%APPDATA%\LighthouseTerminal\config.json`(Windows)
 ### 📊 参数系统
 - **参数树**：按 `sys / journal / timebase / carrier / laser / rotor / ootx / accel / fcal / led / log / stats` 前缀分组展示所有参数
 - 带 `*` 标记的动态参数高亮为橙色
+- **参数专家**（高级模式）：121 参数完整表，含类型 / 偏移 / 默认值 / 描述；双击类型安全编辑（布尔下拉、整型范围校验、浮点校验）；搜索 + 类型过滤；未保存变更高亮跟踪；一键保存到闪存；**按设备固化的参数基线**——首次连接自动固化，此后改动与基线差异一目了然
 - **校准参数面板**：Axis 0 / Axis 1 并排对比 7 项 fcal 出厂校准值
 - **Mode 切换器**：下拉选择 + 确认弹窗，一键切换基站运行配置模式（0-16）
 
@@ -65,6 +66,7 @@ Your choice is remembered in `%APPDATA%\LighthouseTerminal\config.json`(Windows)
 ### 🔧 维护工具（高级功能 → 高级模式 勾选后显示）
 - **参数闪存分区**：`param part` 表格化显示 Par0/1（NORM）/ Par2（FACT）、CRC 状态（CRC-BAD 红色高亮）、版本号；保存到分区（修复）/ 从分区加载 / 擦除分区
 - **EEPROM 读取**：`eeprom r <地址> <长度>` 十六进制查看器（参数分区从 0x0000 开始，CPRM 魔数 + 版本 + CRC）
+- **履历日志查看器**：一键扫描 journal 记录区，按时间列出每次开关机的 boots/locks/faults/spins/sweeps 快照，最新记录黄色高亮
 - **基站电源**：`sys.standby` 休眠 / 唤醒一键切换，休眠后串口仍可用
 - **恢复参数备份 / 写入 FCAL 校准**：从 JSON 备份逐条恢复到设备并保存闪存（FCAL 覆盖需二次确认）
 - **进入无线 DFU 模式**：`serial_dfu` 入口（后续用 nrfutil 刷写）
