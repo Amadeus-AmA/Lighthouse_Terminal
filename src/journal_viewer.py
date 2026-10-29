@@ -116,6 +116,45 @@ def update_store(serial_id: str, recs: list, cb: int, cf: int, cl: int) -> dict:
     return st
 
 
+def _parse_journal_list(text: str) -> list:
+    """解析固件 `journal list` 的 %JS 行: id, crc, ticks, boots, locks, spins, sweeps, faults, reason"""
+    recs = []
+    for line in text.splitlines():
+        m = re.match(r'%JS\s+(\d+):\s+([0-9A-Fa-f]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)', line.strip())
+        if m:
+            g = m.groups()
+            recs.append({'id': int(g[0]), 'crc': g[1], 'life': int(g[2]),
+                         'boots': int(g[3]), 'locks': int(g[4]),
+                         'spins': int(g[5]), 'sweeps': int(g[6]),
+                         'faults': int(g[7]), 'reason': g[8]})
+    recs.sort(key=lambda r: (r['life'], r['id']))
+    return recs
+
+
+def _parse_journal_faults(text: str) -> list:
+    """解析 `journal faults` 的故障事件 (%J0 id crc type / %J1 时刻 / %J2 状态)"""
+    events = []
+    cur = None
+    for line in text.splitlines():
+        line = line.strip()
+        m = re.match(r'%J0\s+(\d+)\s+([0-9A-Fa-f]+)\s+(\S+)', line)
+        if m:
+            cur = {'id': int(m.group(1)), 'crc': m.group(2), 'type': m.group(3)}
+            continue
+        if cur is None:
+            continue
+        m = re.match(r'%J1\s+(.*)', line)
+        if m:
+            cur['when'] = m.group(1).strip()
+            continue
+        m = re.match(r'%J2\s+(.*)', line)
+        if m:
+            cur['state'] = m.group(1).strip()
+            events.append(cur)
+            cur = None
+    return events
+
+
 def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     win = tk.Toplevel(parent)
     win.title(tr_text("履历日志查看器 (journal 记录区 0x554-0xFC0)"))
@@ -127,16 +166,21 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     info = tk.Label(win, text=trf("journal.reading"), fg="#7f8c8d", anchor="w")
     info.pack(fill=tk.X, padx=8, pady=(2, 2))
 
-    cols = ("addr", "life", "boots", "locks", "faults", "spins", "sweeps")
+    faults_lbl = tk.Label(win, text="", anchor="w", justify=tk.LEFT,
+                          font=("Consolas", 9), fg="#e67e22")
+    faults_lbl.pack(fill=tk.X, padx=8)
+
+    cols = ("id", "life", "boots", "locks", "faults", "spins", "sweeps", "reason")
     tree = ttk.Treeview(win, columns=cols, show="headings")
     for key, text, width, anchor in (
-            ("addr", "记录地址", 90, "w"),
+            ("id", "ID", 50, "w"),
             ("life", "累计运行", 170, "w"),
             ("boots", "上电次数", 90, "e"),
             ("locks", "PLL 锁定", 90, "e"),
             ("faults", "故障数", 80, "e"),
             ("spins", "spins", 110, "e"),
-            ("sweeps", "sweeps", 110, "e")):
+            ("sweeps", "sweeps", 110, "e"),
+            ("reason", "原因", 90, "w")):
         tree.heading(key, text=tr_text(text))
         tree.column(key, width=width, anchor=anchor)
     tree.tag_configure("newest", background="#fff3cd")
@@ -150,29 +194,25 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     summary.pack(fill=tk.X, padx=8, pady=(2, 6))
 
     def work():
-        # 1) 日志区
-        cmd = f"eeprom r 0x{LOG_BASE:X} {READ_LEN}"
-        resp = serial_manager.send_command(cmd, wait_response=True, timeout=20.0)
-        # 2) 当前参数计数
-        cur = {}
-        for key in ("journal.boots", "journal.faults", "journal.life"):
-            r = serial_manager.send_command(f"param get {key}",
-                                            wait_response=True, timeout=2.0)
-            for line in r.splitlines():
-                if line.strip().startswith(key):
-                    cur[key] = line.strip().split()[1]
+        cmd_log = "journal list"
+        cmd_faults = "journal faults"
+        resp = serial_manager.send_command(cmd_log, wait_response=True, timeout=10.0)
+        resp_f = serial_manager.send_command(cmd_faults, wait_response=True, timeout=6.0)
+        resp_raw = serial_manager.send_command(f"eeprom r 0x{LOG_BASE:X} {READ_LEN}",
+                                               wait_response=True, timeout=20.0)
 
         def done():
-            if ":" not in resp:
+            if "%JS" not in resp:
                 info.configure(text=trf("journal.read_failed"), fg="#e74c3c")
                 return
-            buf = _parse_hexdump(resp)
-            recs = _extract_records(buf)
+            recs = _parse_journal_list(resp)
+            events = _parse_journal_faults(resp_f) if "%J0" in resp_f else []
             for r in recs:
                 tree.insert("", tk.END, values=(
-                    f"0x{r['addr']:04X}",
-                    f"{r['life']} s ({r['life'] / 3600:.2f} h)",
-                    r['boots'], r['locks'], r['faults'], r['spins'], r['sweeps']),
+                    f"{r['id']:02d}",
+                    f"{r['life'] / 48_000_000 / 3600:.2f} h",
+                    r['boots'], r['locks'], r['faults'], r['spins'], r['sweeps'],
+                    r['reason']),
                     tags=("newest",) if r is recs[-1] else ())
             info.configure(text=trf("journal.source"), fg="#7f8c8d")
             if recs:
@@ -180,28 +220,35 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
                 summary.configure(text=trf("journal.summary", count=len(recs),
                                            boots0=lo['boots'], boots1=hi['boots'],
                                            faults0=lo['faults'], faults1=hi['faults'],
-                                           hours=hi['life'] / 3600))
+                                           hours=hi['life'] / 48_000_000 / 3600))
             else:
                 summary.configure(text=tr_text("未识别到有效记录"))
 
-            # 3) 校验
             try:
-                cb = int(cur.get("journal.boots", 0))
-                cf = int(cur.get("journal.faults", 0))
-                cl = int(cur.get("journal.life", 0))
+                cur_boots = int(cur.get("journal.boots", 0))
+                cur_faults = int(cur.get("journal.faults", 0))
+                cur_life = int(cur.get("journal.life", 0))
             except ValueError:
                 verdict.configure(text=tr_text("journal.cur_unreadable"), fg="#e67e22")
                 return
             sid = device_id_provider() if device_id_provider else ""
             st = load_store(sid)
-            codes = analyze_consistency(recs, cb, cf, cl, st)
+            # 防篡改比对用 FRAM 镜像记录 (与参数系统同步节奏一致;
+            # journal list 的内部记录天然领先参数值, 不可用作比对基准)
+            fram_recs = _extract_records(_parse_hexdump(resp_raw))
+            codes = analyze_consistency(fram_recs, cur_boots, cur_faults, cur_life, st)
             if codes:
                 verdict.configure(text=trf("journal.verdict_fail", codes=" ".join(codes)),
                                   fg="#e74c3c")
             else:
                 verdict.configure(text=trf("journal.verdict_ok"), fg="#27ae60")
             if sid:
-                update_store(sid, recs, cb, cf, cl)
+                update_store(sid, fram_recs, cur_boots, cur_faults, cur_life)
+            # 故障病史区
+            if events:
+                ev_text = "\n".join(
+                    f"#{e['id']:02d}  {e['type']}  @ {e['when']}" for e in events)
+                faults_lbl.configure(text=ev_text, fg="#e67e22")
 
         win.after(0, done)
 
