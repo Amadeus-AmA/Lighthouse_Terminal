@@ -390,6 +390,12 @@ TRANSLATIONS.update({
     "journal.cur_unreadable": {
         "zh": "履历校验: 数据读取异常",
         "en": "History check: read error"},
+    "journal.warn_laser_weak": {
+        "zh": "履历含 {count} 条激光衰弱记录 — 激光可能正在老化, 建议关注",
+        "en": "{count} laser-weak records in history - the laser may be degrading"},
+    "journal.warn_laser_dead": {
+        "zh": "履历含 {count} 条激光失效记录 — 该激光曾发生过失效",
+        "en": "{count} laser-dead records in history - this laser has failed before"},
     "expert.collecting": {"zh": "正在采集元数据 {i}/{total} ...", "en": "Collecting metadata {i}/{total} ..."},
     "expert.collected_done": {"zh": "元数据采集完成: {count} 个参数", "en": "Metadata collected: {count} parameters"},
     "expert.values_loaded": {"zh": "已加载 {count} 个参数值", "en": "Loaded {count} parameter values"},

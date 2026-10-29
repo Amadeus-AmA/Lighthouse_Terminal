@@ -16,6 +16,14 @@ LOG_TOP = 0xFC0
 READ_LEN = LOG_TOP - LOG_BASE  # 2668
 BOOTS_TOLERANCE = 5
 
+REASON_ZH = {
+    'boot': '开机', 'lock': 'PLL 锁定', 'crash': '固件崩溃', 'mark': '标记',
+    'fault-set': '故障置位', 'fault-clear': '故障清除', 'fault-motor': '电机故障',
+    'fault-laser-dead': '激光失效', 'fault-laser-weak': '激光衰弱',
+    'sleep': '进入休眠', 'wake': '休眠唤醒', 'user-request': '用户请求',
+    'initial': '出厂初始',
+}
+
 
 def _parse_hexdump(text: str) -> bytes:
     data = {}
@@ -155,6 +163,18 @@ def _parse_journal_faults(text: str) -> list:
     return events
 
 
+def compose_laser_warnings(recs: list) -> list:
+    counts = {}
+    for r in recs:
+        counts[r['reason']] = counts.get(r['reason'], 0) + 1
+    out = []
+    if counts.get('fault-laser-weak'):
+        out.append(trf("journal.warn_laser_weak", count=counts['fault-laser-weak']))
+    if counts.get('fault-laser-dead'):
+        out.append(trf("journal.warn_laser_dead", count=counts['fault-laser-dead']))
+    return out
+
+
 def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     win = tk.Toplevel(parent)
     win.title(tr_text("履历日志查看器 (journal 记录区 0x554-0xFC0)"))
@@ -162,6 +182,9 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
 
     verdict = tk.Label(win, text="", anchor="w", font=("", 9, "bold"), justify=tk.LEFT)
     verdict.pack(fill=tk.X, padx=8, pady=(6, 0))
+
+    warn_lbl = tk.Label(win, text="", anchor="w", justify=tk.LEFT, fg="#e67e22")
+    warn_lbl.pack(fill=tk.X, padx=8)
 
     info = tk.Label(win, text=trf("journal.reading"), fg="#7f8c8d", anchor="w")
     info.pack(fill=tk.X, padx=8, pady=(2, 2))
@@ -180,7 +203,7 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
             ("faults", "故障数", 80, "e"),
             ("spins", "spins", 110, "e"),
             ("sweeps", "sweeps", 110, "e"),
-            ("reason", "原因", 90, "w")):
+            ("reason", "原因", 170, "w")):
         tree.heading(key, text=tr_text(text))
         tree.column(key, width=width, anchor=anchor)
     tree.tag_configure("newest", background="#fff3cd")
@@ -191,7 +214,17 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     ys.pack(side=tk.RIGHT, fill=tk.Y)
 
     summary = tk.Label(win, text="", anchor="w", font=("", 9, "bold"))
-    summary.pack(fill=tk.X, padx=8, pady=(2, 6))
+    summary.pack(fill=tk.X, padx=8, pady=(2, 0))
+
+    legend = tk.Label(win, text="原因: " + "  ".join(
+        f"{k}={v}" for k, v in REASON_ZH.items()),
+        font=("", 8), fg="#95a5a6", anchor="w", wraplength=990, justify=tk.LEFT)
+    legend.pack(fill=tk.X, padx=8, pady=(0, 6))
+
+    # 控件引用 (测试/刷新用)
+    win._ui = {'verdict': verdict, 'warn': warn_lbl, 'info': info,
+               'faults': faults_lbl, 'tree': tree, 'summary': summary,
+               'legend': legend}
 
     def work():
         cmd_log = "journal list"
@@ -200,6 +233,13 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
         resp_f = serial_manager.send_command(cmd_faults, wait_response=True, timeout=6.0)
         resp_raw = serial_manager.send_command(f"eeprom r 0x{LOG_BASE:X} {READ_LEN}",
                                                wait_response=True, timeout=20.0)
+        cur = {}
+        for key in ("journal.boots", "journal.faults", "journal.life"):
+            r = serial_manager.send_command(f"param get {key}",
+                                            wait_response=True, timeout=2.0)
+            for line in r.splitlines():
+                if line.strip().startswith(key):
+                    cur[key] = line.strip().split()[1]
 
         def done():
             if "%JS" not in resp:
@@ -208,11 +248,12 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
             recs = _parse_journal_list(resp)
             events = _parse_journal_faults(resp_f) if "%J0" in resp_f else []
             for r in recs:
+                reason_zh = REASON_ZH.get(r['reason'], r['reason'])
                 tree.insert("", tk.END, values=(
                     f"{r['id']:02d}",
                     f"{r['life'] / 48_000_000 / 3600:.2f} h",
                     r['boots'], r['locks'], r['faults'], r['spins'], r['sweeps'],
-                    r['reason']),
+                    f"{r['reason']} {reason_zh}"),
                     tags=("newest",) if r is recs[-1] else ())
             info.configure(text=trf("journal.source"), fg="#7f8c8d")
             if recs:
@@ -244,10 +285,17 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
                 verdict.configure(text=trf("journal.verdict_ok"), fg="#27ae60")
             if sid:
                 update_store(sid, fram_recs, cur_boots, cur_faults, cur_life)
+            # 激光老化预警
+            laser_warns = compose_laser_warnings(recs)
+            if laser_warns:
+                warn_lbl.configure(text="⚠ " + "\n⚠ ".join(laser_warns), fg="#e74c3c")
+            else:
+                warn_lbl.configure(text="")
             # 故障病史区
             if events:
                 ev_text = "\n".join(
-                    f"#{e['id']:02d}  {e['type']}  @ {e['when']}" for e in events)
+                    f"#{e['id']:02d}  {REASON_ZH.get(e['type'], e['type'])} ({e['type']})  @ {e['when']}"
+                    for e in events)
                 faults_lbl.configure(text=ev_text, fg="#e67e22")
 
         win.after(0, done)
