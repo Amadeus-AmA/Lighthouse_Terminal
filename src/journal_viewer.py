@@ -21,7 +21,7 @@ REASON_ZH = {
     'fault-set': '故障置位', 'fault-clear': '故障清除', 'fault-motor': '电机故障',
     'fault-laser-dead': '激光失效', 'fault-laser-weak': '激光衰弱',
     'sleep': '进入休眠', 'wake': '休眠唤醒', 'user-request': '用户请求',
-    'initial': '出厂初始',
+    'initial': '出厂初始', 'reset': '复位重启',
 }
 
 
