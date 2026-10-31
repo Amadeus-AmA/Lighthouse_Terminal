@@ -226,7 +226,7 @@ TEXT_EN = {
     "日志设置": "Log settings", "当前状态": "Current status", "级别:": "Level:", "日志级别": "Log level",
     "日志来源筛选": "Log source filter", "应用筛选": "Apply filter", "操作": "Actions", "从设备刷新状态": "Refresh from device",
     "重置为默认 (Debug + 全开)": "Reset to defaults (Debug + all sources)", "消息": "Messaging", "电机": "Rotor", "激光": "Laser", "系统": "System",
-    "正在读取 EEPROM 履历记录区 (0x554-0xFC0, 2668 字节)...": "Reading EEPROM history records (0x554-0xFC0, 2668 bytes)...",
+    "正在读取 EEPROM 履历记录环 (0x580-0xFC0, 2624 字节)...": "Reading EEPROM history ring (0x580-0xFC0, 2624 bytes)...",
     "扫描并查看履历日志": "Scan and view history log", "正在采集 Mode 0-16 数据...": "Collecting Mode 0-16 data...",
     "Mode 数据采集完成": "Mode data collection complete", "正在连接设备...": "Connecting to device...",
 }
@@ -271,8 +271,8 @@ TEXT_EN.update({
         "Each power cycle leaves a boots/locks/faults/spins/sweeps snapshot for auditing real usage and power-loss history.",
     "休眠后电机与激光停转, 串口控制台仍然可用, 点击唤醒即可恢复。":
         "Motors and lasers stop while asleep; the serial console stays available - wake to resume.",
-    "DFU: 进入后控制台关闭, 使用 nrfutil dfu serial -b115200 -prn 1 刷写无线电固件。":
-        "DFU: the console closes after entering; flash the radio with nrfutil dfu serial -b115200 -prn 1.",
+    "DFU: 进入后控制台关闭, 无线电固件 (BCM20736) 需用对应工具刷写。":
+        "DFU: the console closes after entering; flash the radio with a BCM20736 tool.",
     "写入可能失败": "Write may have failed", "正在写入": "Writing",
     # log panel
     "级别": "Level", "消息": "Messaging", "系统": "System", "应用筛选": "Apply filter",
@@ -292,7 +292,7 @@ TEXT_EN.update({
     "确认写入 FCAL 校准": "Confirm FCAL write", "写入完成": "Write complete",
     "正在恢复参数": "Restoring parameters", "正在写入 FCAL": "Writing FCAL",
     # journal viewer
-    "履历日志查看器 (journal 记录区 0x554-0xFC0)": "History log viewer (journal records 0x554-0xFC0)",
+    "履历日志查看器 (journal 记录环 0x580-0xFC0)": "History log viewer (journal ring 0x580-0xFC0)",
     "记录地址": "Record addr", "累计运行": "Accumulated", "上电次数": "Boot count",
     "PLL 锁定": "PLL locks", "故障数": "Faults", "未识别到有效记录": "No valid records found",
     # charts
@@ -362,8 +362,8 @@ TRANSLATIONS.update({
     "maint.loaded": {"zh": "已从分区 {n} 加载", "en": "Loaded from partition {n}"},
     "maint.erased": {"zh": "已擦除分区 {n}", "en": "Erased partition {n}"},
     "maint.dfu_body": {
-        "zh": "将发送 serial_dfu, 控制台会话随即关闭。\n之后请用 nrfutil 在同一串口刷写无线电固件。\n确认进入?",
-        "en": "serial_dfu will be sent and the console session closes.\nFlash the radio with nrfutil on the same port.\nEnter DFU?"},
+        "zh": "将发送 serial_dfu, 控制台会话随即关闭。\n之后请用 BCM20736 对应工具在同一串口刷写无线电固件。\n确认进入?",
+        "en": "serial_dfu will be sent and the console session closes.\nFlash the radio with a BCM20736 tool on the same port.\nEnter DFU?"},
     "maint.range_saved": {"zh": "已保存:\n{path}", "en": "Saved:\n{path}"},
     "maint.partition_saved": {"zh": "分区 {n} 原始数据已保存:\n{path}", "en": "Raw data of partition {n} saved to:\n{path}"},
     "maint.standby_sent": {"zh": "已发送{action}命令 ({time})", "en": "{action} command sent ({time})"},
@@ -409,14 +409,14 @@ TRANSLATIONS.update({
         "zh": "该字段是设备身份信息, 修改会影响设备识别!\n",
         "en": "This is a device identity field; changing it affects identification!\n"},
     "journal.reading": {
-        "zh": "正在读取 EEPROM 履历记录区 (0x554-0xFC0, 2668 字节)...",
-        "en": "Reading EEPROM history records (0x554-0xFC0, 2668 bytes)..."},
+        "zh": "正在读取 EEPROM 履历记录环 (0x580-0xFC0, 2624 字节)...",
+        "en": "Reading EEPROM history ring (0x580-0xFC0, 2624 bytes)..."},
     "journal.read_failed": {
         "zh": "读取失败: 未获取到数据, 请确认设备已连接",
         "en": "Read failed: no data received; check the connection"},
     "journal.source": {
-        "zh": "数据源: eeprom r 0x554 2668 | 记录按累计运行时间排序, 黄色行为最新一条",
-        "en": "Source: eeprom r 0x554 2668 | Sorted by accumulated runtime; the yellow row is the newest"},
+        "zh": "数据源: eeprom r 0x580 2624 | 记录按累计运行时间排序, 黄色行为最新一条",
+        "en": "Source: eeprom r 0x580 2624 | Sorted by accumulated runtime; the yellow row is the newest"},
     "journal.summary": {
         "zh": "共 {count} 条记录 | 上电次数 {boots0} → {boots1} | 故障 {faults0} → {faults1} | 累计运行 {hours:.1f} h",
         "en": "{count} records | Boots {boots0} → {boots1} | Faults {faults0} → {faults1} | Runtime {hours:.1f} h"},
@@ -613,3 +613,94 @@ class Translator:
             return text.format(**values)
         except (KeyError, ValueError):
             return text
+
+
+# ---------- 工厂校准说明 / 固件刷写 (救砖) ----------
+TEXT_EN.update({
+    '工厂校准说明...': 'Factory calibration guide...',
+    '工厂校准说明 (只读)': 'Factory calibration guide (read-only)',
+    '本页为只读说明, 命令需在终端页手动执行, 执行前请确认理解每个步骤。': 'This page is a read-only reference. Commands are run manually in the terminal tab; make sure you understand each step before running them.',
+    '固件刷写 (救砖)...': 'Firmware flash (rescue)...',
+    '固件刷写 (救砖)': 'Firmware flash (rescue)',
+    '固件刷写: 经引导器 (CRP DISABLD 磁盘) 写入主控固件, 断电重上电完成; EEPROM 与履历不受影响。': 'Firmware flash: writes the MCU firmware via the bootloader (CRP DISABLD drive); a power cycle completes it. EEPROM and the device history are unaffected.',
+    '只刷同型号设备的固件文件 (.bin, ≤128KB)。\\n刷写过程: 设备重启进入引导器 → 固件写入引导器盘 → 给基站断电再上电完成。\\n过程中串口断开属正常; EEPROM 参数与设备履历不受影响。': 'Only flash firmware files (.bin, ≤128KB) belonging to this device model.\\nFlow: the device reboots into the bootloader → firmware is written to the bootloader drive → power-cycle the base station to finish.\\nThe serial port disconnecting during the process is normal; EEPROM parameters and the device history are unaffected.',
+    '固件文件 (.bin):': 'Firmware file (.bin):',
+    '浏览...': 'Browse...',
+    '开始刷写': 'Start flash',
+    '从引导器读取固件...': 'Read firmware from bootloader...',
+    '选择要刷写的固件文件 (.bin)': 'Select the firmware file to flash (.bin)',
+    '固件文件': 'Firmware files',
+    '所有文件': 'All files',
+    '读取文件失败: {err}': 'Failed to read file: {err}',
+    '文件大小 {size} 字节, 超出 128KB 闪存上限': 'File is {size} bytes, exceeding the 128KB flash limit',
+    '大小 {size} 字节 | SHA-256 {sha}...': 'Size {size} bytes | SHA-256 {sha}...',
+    '发送 isp, 设备重启进入引导器...': 'Sending isp, device reboots into the bootloader...',
+    '串口已断开 (预期行为)': 'Serial port disconnected (expected)',
+    '等待 CRP DISABLD 磁盘出现...': 'Waiting for the CRP DISABLD drive...',
+    '未检测到 CRP 磁盘。请确认设备已进入引导器': 'CRP drive not found. Make sure the device is in bootloader mode',
+    '(可按住烧录键重新上电), 再重试。': ' (power on while holding the ISP button), then retry.',
+    '检测到引导器磁盘 {drive}, 正在写入固件...': 'Bootloader drive {drive} found, writing firmware...',
+    '固件数据已写入 ({size} 字节)。': 'Firmware data written ({size} bytes).',
+    '写入失败: {err}': 'Write failed: {err}',
+    '请给基站断电再上电完成刷写。': 'Power-cycle the base station to complete the flash.',
+    '断电前无串口属正常现象; 上电后重新连接即可验证。': 'No serial port before the power cycle is normal; reconnect afterwards to verify.',
+    '仅支持 Windows 系统': 'Windows only',
+    '请先选择固件文件': 'Select a firmware file first',
+    '确认刷写固件': 'Confirm firmware flash',
+    '将重启设备进入引导器并写入所选固件。\\nEEPROM 参数与设备履历不受影响。\\n过程中串口断开属正常现象。\\n\\n继续?': 'The device will reboot into the bootloader and the selected firmware will be written.\\nEEPROM parameters and the device history are unaffected.\\nThe serial port disconnecting is normal.\\n\\nContinue?',
+    '当前不在引导器模式: 未检测到 CRP 磁盘。\\n先点击 开始刷写 进入引导器, 或按住烧录键重新上电。': 'Not in bootloader mode: no CRP drive found.\\nClick Start flash to enter the bootloader first, or power on while holding the ISP button.',
+    '引导器盘上没有 firmware.bin, 请稍候重试': 'No firmware.bin on the bootloader drive yet, retry shortly',
+    '保存固件备份': 'Save firmware backup',
+    '已保存固件备份: {path}': 'Firmware backup saved: {path}',
+})
+
+
+# ---------- 一键体检 / 履历 CRC 徽标 ----------
+TEXT_EN.update({
+    '一键体检...': 'One-click health check...',
+    '一键体检报告': 'One-click health report',
+    '重新体检': 'Re-run check',
+    '正在采集...': 'Collecting...',
+    '正在采集数据, 请稍候...': 'Collecting data, please wait...',
+    '完成': 'Done',
+    'Lighthouse 基站体检报告': 'Lighthouse base station health report',
+    '生成时间: {t}': 'Generated: {t}',
+    '设备名称: {name}    端口: {port}': 'Device name: {name}    Port: {port}',
+    '◆ 参数分区': '- Parameter partitions',
+    '正常': 'OK',
+    '分区 CRC 异常, 参数可能损坏': 'Partition CRC bad, parameters may be corrupted',
+    '无法读取分区状态': 'Unable to read partition status',
+    '◆ 设备履历': '- Device history',
+    '上电次数: {b}    累计运行: {h} h    历史故障: {f}': 'Power-ons: {b}    Powered hours: {h} h    Faults: {f}',
+    '记录 CRC: {ok} 有效 / {bad} 异常': 'Record CRC: {ok} valid / {bad} bad',
+    '空槽: {z}/{n} — 异常空槽, 履历存在被清除迹象': 'Empty slots: {z}/{n} - abnormal, history appears to have been cleared',
+    '空槽: {z}/{n}': 'Empty slots: {z}/{n}',
+    '◆ 转子': '- Rotor',
+    '抖动 σ={s}us ({p} ppm)': 'Jitter sigma={s}us ({p} ppm)',
+    '转速 {f} Hz    ': 'Speed {f} Hz    ',
+    '抖动偏大, 建议关注轴承状态': 'Jitter is high, bearing may need attention',
+    '无法读取转子统计 (设备可能处于休眠)': 'Unable to read rotor stats (device may be in standby)',
+    '结论: {n} 项检查, {p} 项需要关注': 'Summary: {n} checks, {p} need attention',
+    '结论: {n} 项检查, 全部正常': 'Summary: {n} checks, all passed',
+    '记录 CRC: {ok} 有效 / {bad} 异常 | 空槽: {zero}/{total}': 'Record CRC: {ok} valid / {bad} bad | empty slots: {zero}/{total}',
+})
+
+
+# ---------- trf 键控模板: 履历 CRC 摘要 ----------
+TRANSLATIONS.update({
+    "journal.crc_summary": {
+        "zh": "记录 CRC: {ok} 有效 / {bad} 异常 | 空槽: {zero}/{total}",
+        "en": "Record CRC: {ok} valid / {bad} bad | empty slots: {zero}/{total}",
+    },
+})
+
+
+# ---------- 体检报告健壮性 ----------
+TEXT_EN.update({
+    "数据采集失败: {err}": "Data collection failed: {err}",
+    "请重新体检; 若反复失败, 检查串口连接与设备状态。":
+        "Re-run the check; if it keeps failing, check the serial connection and device state.",
+    "少量坏记录常见于写入时断电或读取竞态, 一般非人为改动":
+        "A few bad records are common after power loss during writes or read races; "
+        "usually not intentional changes",
+})

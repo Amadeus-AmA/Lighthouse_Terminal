@@ -80,7 +80,7 @@ class LaserPanel(tk.Frame):
         btn_row = tk.Frame(state_frame)
         btn_row.grid(row=(len(STATE_PARAMS) + 1) // 2, column=0, columnspan=2,
                      sticky="w", padx=10, pady=(4, 2))
-        ttk.Button(btn_row, text="刷新状态", command=self.refresh).pack(side=tk.LEFT)
+        ttk.Button(btn_row, text="刷新读数", command=self.refresh).pack(side=tk.LEFT)
         ttk.Checkbutton(btn_row, text="自动刷新 (3秒)", variable=self._auto_var,
                         command=self._toggle_auto).pack(side=tk.LEFT, padx=(12, 0))
 

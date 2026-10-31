@@ -5,6 +5,9 @@ import time
 
 from backup_compare import restore_params_from_json, restore_fcal_to_device, BACKUP_DIR
 from journal_viewer import open_journal_viewer
+from factory_doc import open_factory_doc
+from firmware_flasher import FirmwareFlasher
+from health_report import open_health_report
 from i18n import tr_text, trf
 
 PARTITION_SLOTS = {0: 0x0000, 1: 0x0180, 2: 0x0300}
@@ -310,9 +313,20 @@ class MaintenancePanel(tk.Frame):
         ttk.Button(btn_row, text="写入 FCAL 校准...", command=self._restore_fcal).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(btn_row, text="进入无线 DFU 模式", command=self._enter_dfu).pack(side=tk.LEFT)
 
+        row2 = tk.Frame(rst_frame)
+        row2.pack(fill=tk.X, padx=8, pady=(0, 6))
+        ttk.Button(row2, text="一键体检...",
+                   command=lambda: open_health_report(self, self._serial,
+                                                      self._device_id_provider)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(row2, text="工厂校准说明...",
+                   command=lambda: open_factory_doc(self)).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(row2, text="固件刷写 (救砖)...",
+                   command=lambda: FirmwareFlasher(self, self._serial)).pack(side=tk.LEFT)
+
         tk.Label(rst_frame,
-                 text="DFU: 进入后控制台关闭, 使用 nrfutil dfu serial -b115200 -prn 1 刷写无线电固件。",
-                 font=("", 8), fg="#7f8c8d", anchor="w").pack(anchor="w", padx=8, pady=(0, 6))
+                 text="DFU: 进入后控制台关闭, 无线电固件 (BCM20736) 需用对应工具刷写。\n"
+                      "固件刷写: 经引导器 (CRP DISABLD 磁盘) 写入主控固件, 断电重上电完成; EEPROM 与履历不受影响。",
+                 font=("", 8), fg="#7f8c8d", anchor="w", justify=tk.LEFT).pack(anchor="w", padx=8, pady=(0, 6))
 
     def _check_connected(self):
         if not self._serial.is_connected():

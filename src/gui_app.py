@@ -35,9 +35,9 @@ param set sys.standby true/false   Sleep/wake the station (verified on hardware)
 [Status and statistics]
 uptime         Show current uptime
 freq           Show rotor frequency (Hz)
-stats          Toggle automatic statistics output
+stats          Toggle periodic statistics stream (send again to stop)
 clear          Clear statistics counters
-dump           Toggle live rotor data output
+dump [0]       Live rotor data stream (dump 0 stops it; survives reconnects)
 perf           Math benchmark (integer/float speed)
 
 [Parameter system]
@@ -101,7 +101,7 @@ led            Control indicator color (RGBW, 0-255)
 [Radio/DTM]
 dtm            Decimal DTM test command (RF certification)
 dtm_pwr        Adjust DTM transmit power
-serial_dfu     Request radio DFU mode (flash with nrfutil dfu serial -b115200 -prn 1)
+serial_dfu     Request radio DFU mode (flash the radio with a BCM20736 tool)
 nonce          Generate a new pairing code
 radio          Radio sub-command tree
 
@@ -121,9 +121,9 @@ param set sys.standby true/false   休眠/唤醒基站（真机验证可用）
 [状态与统计]
 uptime         显示系统本次运行时间
 freq           显示转子当前旋转频率（Hz）
-stats          切换统计信息自动打印
+stats          切换周期统计输出 (再次发送停止)
 clear          清空统计计数器
-dump           切换转子数据实时输出
+dump [0]       转子数据实时流 (dump 0 停止; 流跨重连持续)
 perf           数学性能基准测试（整数/浮点运算速度）
 
 [参数系统]
@@ -187,7 +187,7 @@ led             控制指示灯颜色 (RGBW, 0-255)
 [无线/DTM]
 dtm             十进制 DTM 测试命令（用于射频认证）
 dtm_pwr         调整 DTM 发射功率
-serial_dfu      请求无线电 DFU 模式（之后用 nrfutil dfu serial -b115200 -prn 1 刷写）
+serial_dfu      请求无线电 DFU 模式（之后用 BCM20736 对应工具刷写）
 nonce           生成新的配对码
 radio           无线子命令树
 
@@ -522,6 +522,11 @@ class LighthouseConsoleApp:
             return
 
         def poll():
+            # 清掉上个会话可能残留的 dump 遥测流 (固件侧跨重连持续)
+            try:
+                self._serial.send_command("dump 0", wait_response=False, timeout=1.0)
+            except Exception:
+                pass
             resp = self._serial.send_command("param list", wait_response=True, timeout=3.0)
             uptime_info = parse_param_uptime(resp)
             laser_info = parse_laser_status(resp)
@@ -569,22 +574,49 @@ class LighthouseConsoleApp:
 
         def work():
             from journal_viewer import (
-                _parse_hexdump, _extract_records,
+                _parse_hexdump, _parse_ring,
                 load_store, update_store, analyze_consistency,
-                LOG_BASE, READ_LEN,
+                RING_BASE, RING_SLOTS, REC_SIZE,
             )
-            resp = self._serial.send_command(f"eeprom r 0x{LOG_BASE:X} {READ_LEN}",
-                                             wait_response=True, timeout=20.0)
-            recs = []
-            if resp and ":" in resp:
-                recs = _extract_records(_parse_hexdump(resp))
+
+            def read_ring():
+                resp = self._serial.send_command(
+                    f"eeprom r 0x{RING_BASE:X} {RING_SLOTS * REC_SIZE}",
+                    wait_response=True, timeout=20.0)
+                if resp and ":" in resp:
+                    return _parse_ring(_parse_hexdump(resp, RING_BASE, RING_SLOTS * REC_SIZE))
+                return [], 0, 0
+
+            def read_live():
+                cur = {}
+                for key in ("journal.boots", "journal.faults", "journal.life"):
+                    r = self._serial.send_command(f"param get {key}",
+                                                  wait_response=True, timeout=2.0)
+                    for line in r.splitlines():
+                        if line.strip().startswith(key):
+                            cur[key] = line.strip().split()[1]
+                try:
+                    return (int(cur.get("journal.boots", cur_boots)),
+                            int(cur.get("journal.faults", cur_faults)),
+                            int(cur.get("journal.life", cur_life)))
+                except ValueError:
+                    return cur_boots, cur_faults, cur_life
+
+            recs, zeros, _bad = read_ring()
+            ok_recs = [r for r in recs if r['crc_ok']]
+            cb, cf, cl = read_live()
             st = load_store(serial_id)
-            codes = analyze_consistency(recs, cur_boots, cur_faults, cur_life, st)
+            codes = analyze_consistency(ok_recs, cb, cf, cl, st, zeros)
+            if any(c in codes for c in ('E1', 'E2', 'E3')):
+                recs, zeros, _bad = read_ring()
+                ok_recs = [r for r in recs if r['crc_ok']]
+                cb, cf, cl = read_live()
+                codes = analyze_consistency(ok_recs, cb, cf, cl, st, zeros)
             if codes:
                 text, color = trf("journal.verdict_fail", codes=" ".join(codes)), "#e74c3c"
             else:
                 text, color = trf("journal.verdict_ok"), "#27ae60"
-            update_store(serial_id, recs, cur_boots, cur_faults, cur_life)
+            update_store(serial_id, ok_recs, cb, cf, cl)
             self.root.after(0, lambda: self._status_panel.set_journal_verdict(text, color))
 
         threading.Thread(target=work, daemon=True).start()

@@ -1,4 +1,4 @@
-"""履历记录查看器 (0x554-0xFC0)"""
+"""履历记录查看器 (journal 记录环 0x580-0xFC0)"""
 import json
 import os
 import re
@@ -7,13 +7,14 @@ import sys
 import threading
 import time
 import tkinter as tk
+import zlib
 from tkinter import ttk
 
 from i18n import tr_text, trf
 
-LOG_BASE = 0x554
-LOG_TOP = 0xFC0
-READ_LEN = LOG_TOP - LOG_BASE  # 2668
+RING_BASE = 0x580
+RING_SLOTS = 54
+REC_SIZE = 48
 BOOTS_TOLERANCE = 5
 
 REASON_ZH = {
@@ -24,8 +25,18 @@ REASON_ZH = {
     'initial': '出厂初始', 'reset': '复位重启',
 }
 
+REASON_BY_IDX = ['initial', 'mark', 'boot', 'reset', 'sleep', 'wake', 'lock',
+                 'user-request', 'fault-set', 'crash', 'fault-clear',
+                 'fault-motor', 'fault-laser-weak', 'fault-laser-dead']
 
-def _parse_hexdump(text: str) -> bytes:
+
+def _crc48(rec: bytes) -> int:
+    b = bytearray(rec)
+    b[0x28:0x2C] = b'\x00\x00\x00\x00'
+    return zlib.crc32(bytes(b)) & 0xFFFFFFFF
+
+
+def _parse_hexdump(text: str, base: int, length: int) -> bytes:
     data = {}
     for line in text.splitlines():
         m = re.match(r'^([0-9A-Fa-f]{6,8}):\s+((?:[0-9A-Fa-f]{2}[ \t]+)+)', line)
@@ -34,27 +45,30 @@ def _parse_hexdump(text: str) -> bytes:
             for h in m.group(2).split():
                 data[a] = int(h, 16)
                 a += 1
-    return bytes(data.get(LOG_BASE + i, 0) for i in range(READ_LEN))
+    return bytes(data.get(base + i, 0) for i in range(length))
 
 
-def _extract_records(buf: bytes) -> list:
-    recs = []
-    for k in range((READ_LEN - 48) // 48 + 1):
-        off = k * 48
-        s = buf[off:off + 48]
-        if s[0x10] or s[0x18] or s[0x28]:
+def _parse_ring(buf: bytes) -> tuple:
+    """解析 54×48B 日志环 → (记录列表, 全零槽数, CRC 异常数)。记录含坏 CRC 也返回。"""
+    recs, zeros, bad = [], 0, 0
+    for i in range(RING_SLOTS):
+        r = buf[i * REC_SIZE:(i + 1) * REC_SIZE]
+        if len(r) < REC_SIZE or r == bytes(REC_SIZE):
+            zeros += 1
             continue
-        life, boots, locks = struct.unpack_from('<III', s, 0)
-        spins = struct.unpack_from('<I', s, 0x0C)[0]
-        sweeps = struct.unpack_from('<I', s, 0x14)[0]
-        faults = struct.unpack_from('<I', s, 0x1C)[0]
-        if not (1000 < life < (1 << 24)) or boots > (1 << 20) or locks > (1 << 20) or faults > (1 << 16):
-            continue
-        recs.append({'addr': LOG_BASE + off, 'life': life, 'boots': boots,
-                     'locks': locks, 'spins': spins, 'sweeps': sweeps,
-                     'faults': faults})
-    recs.sort(key=lambda r: (r['life'], r['addr']))
-    return recs
+        ok = _crc48(r) == struct.unpack_from('<I', r, 0x28)[0]
+        if not ok:
+            bad += 1
+        ticks = struct.unpack_from('<Q', r, 0)[0]
+        boots, locks = struct.unpack_from('<II', r, 8)
+        spins, sweeps = struct.unpack_from('<QQ', r, 0x10)
+        faults = struct.unpack_from('<I', r, 0x20)[0]
+        ridx = r[0x24] if r[0x24] < len(REASON_BY_IDX) else 0
+        recs.append({'slot': i, 'life': ticks, 'boots': boots, 'locks': locks,
+                     'spins': spins, 'sweeps': sweeps, 'faults': faults,
+                     'reason': REASON_BY_IDX[ridx], 'crc_ok': ok})
+    recs.sort(key=lambda x: (x['life'], x['slot']))
+    return recs, zeros, bad
 
 
 # ---------- 校验 ----------
@@ -90,7 +104,7 @@ def save_store(serial_id: str, data: dict) -> None:
         pass
 
 
-def analyze_consistency(recs: list, cb: int, cf: int, cl: int, st: dict) -> list:
+def analyze_consistency(recs: list, cb: int, cf: int, cl: int, st: dict, zs: int = 0) -> list:
     out = []
     mb = max((r['boots'] for r in recs), default=0)
     mf = max((r['faults'] for r in recs), default=0)
@@ -112,6 +126,8 @@ def analyze_consistency(recs: list, cb: int, cf: int, cl: int, st: dict) -> list
         out.append('E6')
     if recs and cb > mb + BOOTS_TOLERANCE:
         out.append('E7')
+    if cb >= 60 and zs >= 4:
+        out.append('E8')
     return out
 
 
@@ -177,7 +193,7 @@ def compose_laser_warnings(recs: list) -> list:
 
 def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     win = tk.Toplevel(parent)
-    win.title(tr_text("履历日志查看器 (journal 记录区 0x554-0xFC0)"))
+    win.title(tr_text("履历日志查看器 (journal 记录环 0x580-0xFC0)"))
     win.geometry("1020x640")
 
     verdict = tk.Label(win, text="", anchor="w", font=("", 9, "bold"), justify=tk.LEFT)
@@ -193,20 +209,22 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
                           font=("Consolas", 9), fg="#e67e22")
     faults_lbl.pack(fill=tk.X, padx=8)
 
-    cols = ("id", "life", "boots", "locks", "faults", "spins", "sweeps", "reason")
+    cols = ("id", "life", "boots", "locks", "faults", "spins", "sweeps", "reason", "crc")
     tree = ttk.Treeview(win, columns=cols, show="headings")
     for key, text, width, anchor in (
-            ("id", "ID", 50, "w"),
-            ("life", "累计运行", 170, "w"),
-            ("boots", "上电次数", 90, "e"),
-            ("locks", "PLL 锁定", 90, "e"),
-            ("faults", "故障数", 80, "e"),
-            ("spins", "spins", 110, "e"),
-            ("sweeps", "sweeps", 110, "e"),
-            ("reason", "原因", 170, "w")):
+            ("id", "ID", 46, "w"),
+            ("life", "累计运行", 150, "w"),
+            ("boots", "上电次数", 80, "e"),
+            ("locks", "PLL 锁定", 80, "e"),
+            ("faults", "故障数", 70, "e"),
+            ("spins", "spins", 100, "e"),
+            ("sweeps", "sweeps", 100, "e"),
+            ("reason", "原因", 150, "w"),
+            ("crc", "CRC", 60, "center")):
         tree.heading(key, text=tr_text(text))
         tree.column(key, width=width, anchor=anchor)
     tree.tag_configure("newest", background="#fff3cd")
+    tree.tag_configure("badcrc", foreground="#e74c3c")
 
     ys = ttk.Scrollbar(win, orient=tk.VERTICAL, command=tree.yview)
     tree.configure(yscrollcommand=ys.set)
@@ -216,6 +234,9 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     summary = tk.Label(win, text="", anchor="w", font=("", 9, "bold"))
     summary.pack(fill=tk.X, padx=8, pady=(2, 0))
 
+    crc_lbl = tk.Label(win, text="", anchor="w", fg="#7f8c8d")
+    crc_lbl.pack(fill=tk.X, padx=8)
+
     legend = tk.Label(win, text="原因: " + "  ".join(
         f"{k}={v}" for k, v in REASON_ZH.items()),
         font=("", 8), fg="#95a5a6", anchor="w", wraplength=990, justify=tk.LEFT)
@@ -224,41 +245,52 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
     # 控件引用 (测试/刷新用)
     win._ui = {'verdict': verdict, 'warn': warn_lbl, 'info': info,
                'faults': faults_lbl, 'tree': tree, 'summary': summary,
-               'legend': legend}
+               'legend': legend, 'crc': crc_lbl}
 
     def work():
-        cmd_log = "journal list"
-        cmd_faults = "journal faults"
-        resp = serial_manager.send_command(cmd_log, wait_response=True, timeout=10.0)
-        resp_f = serial_manager.send_command(cmd_faults, wait_response=True, timeout=6.0)
-        resp_raw = serial_manager.send_command(f"eeprom r 0x{LOG_BASE:X} {READ_LEN}",
-                                               wait_response=True, timeout=20.0)
-        cur = {}
-        for key in ("journal.boots", "journal.faults", "journal.life"):
-            r = serial_manager.send_command(f"param get {key}",
-                                            wait_response=True, timeout=2.0)
-            for line in r.splitlines():
-                if line.strip().startswith(key):
-                    cur[key] = line.strip().split()[1]
+        try:
+            cmd_faults = "journal faults"
+            resp_f = serial_manager.send_command(cmd_faults, wait_response=True, timeout=6.0)
+            resp_raw = serial_manager.send_command(f"eeprom r 0x{RING_BASE:X} {RING_SLOTS * REC_SIZE}",
+                                                   wait_response=True, timeout=20.0)
+            cur = {}
+            for key in ("journal.boots", "journal.faults", "journal.life"):
+                r = serial_manager.send_command(f"param get {key}",
+                                                wait_response=True, timeout=2.0)
+                for line in r.splitlines():
+                    if line.strip().startswith(key):
+                        cur[key] = line.strip().split()[1]
+        except Exception as e:
+            def fail():
+                info.configure(text=trf("journal.read_failed") + " " + str(e), fg="#e74c3c")
+            win.after(0, fail)
+            return
 
         def done():
-            if "%JS" not in resp:
-                info.configure(text=trf("journal.read_failed"), fg="#e74c3c")
-                return
-            recs = _parse_journal_list(resp)
+            buf = _parse_hexdump(resp_raw, RING_BASE, RING_SLOTS * REC_SIZE)
+            recs, zeros, bad = _parse_ring(buf)
             events = _parse_journal_faults(resp_f) if "%J0" in resp_f else []
             for r in recs:
                 reason_zh = REASON_ZH.get(r['reason'], r['reason'])
+                tags = []
+                if r is recs[-1]:
+                    tags.append("newest")
+                if not r['crc_ok']:
+                    tags.append("badcrc")
                 tree.insert("", tk.END, values=(
-                    f"{r['id']:02d}",
+                    f"{r['slot']:02d}",
                     f"{r['life'] / 48_000_000 / 3600:.2f} h",
                     r['boots'], r['locks'], r['faults'], r['spins'], r['sweeps'],
-                    f"{r['reason']} {reason_zh}"),
-                    tags=("newest",) if r is recs[-1] else ())
+                    f"{r['reason']} {reason_zh}",
+                    "OK" if r['crc_ok'] else "BAD"),
+                    tags=tuple(tags))
             info.configure(text=trf("journal.source"), fg="#7f8c8d")
-            if recs:
-                lo, hi = recs[0], recs[-1]
-                summary.configure(text=trf("journal.summary", count=len(recs),
+            crc_lbl.configure(text=trf("journal.crc_summary", ok=len(recs) - bad,
+                                       bad=bad, zero=zeros, total=RING_SLOTS))
+            ok_recs = [r for r in recs if r['crc_ok']]
+            if ok_recs:
+                lo, hi = ok_recs[0], ok_recs[-1]
+                summary.configure(text=trf("journal.summary", count=len(ok_recs),
                                            boots0=lo['boots'], boots1=hi['boots'],
                                            faults0=lo['faults'], faults1=hi['faults'],
                                            hours=hi['life'] / 48_000_000 / 3600))
@@ -274,17 +306,14 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
                 return
             sid = device_id_provider() if device_id_provider else ""
             st = load_store(sid)
-            # 防篡改比对用 FRAM 镜像记录 (与参数系统同步节奏一致;
-            # journal list 的内部记录天然领先参数值, 不可用作比对基准)
-            fram_recs = _extract_records(_parse_hexdump(resp_raw))
-            codes = analyze_consistency(fram_recs, cur_boots, cur_faults, cur_life, st)
+            codes = analyze_consistency(ok_recs, cur_boots, cur_faults, cur_life, st, zeros)
             if codes:
                 verdict.configure(text=trf("journal.verdict_fail", codes=" ".join(codes)),
                                   fg="#e74c3c")
             else:
                 verdict.configure(text=trf("journal.verdict_ok"), fg="#27ae60")
             if sid:
-                update_store(sid, fram_recs, cur_boots, cur_faults, cur_life)
+                update_store(sid, ok_recs, cur_boots, cur_faults, cur_life)
             # 激光老化预警
             laser_warns = compose_laser_warnings(recs)
             if laser_warns:
@@ -301,3 +330,4 @@ def open_journal_viewer(parent, serial_manager, device_id_provider=None):
         win.after(0, done)
 
     threading.Thread(target=work, daemon=True).start()
+    return win

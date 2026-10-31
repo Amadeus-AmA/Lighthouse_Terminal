@@ -44,7 +44,7 @@ class DumpViewer:
             while time.time() - start < 20.0:
                 time.sleep(0.2)
 
-            self._serial.send_command("dump", wait_response=True, timeout=2.0)
+            self._serial.send_command("dump 0", wait_response=True, timeout=2.0)
             time.sleep(0.5)
 
             self._serial.set_data_callback(original_cb)
