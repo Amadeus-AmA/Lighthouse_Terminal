@@ -56,3 +56,6 @@ tools/
 # 本机设备状态存储
 .lht/
 docs/
+
+# 图标生成器仅本地使用
+src/assets/make_*.py

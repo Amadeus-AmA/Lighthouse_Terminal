@@ -292,6 +292,11 @@ class LighthouseConsoleApp:
         self._language_cascade_index = menubar.index("end") + 1
         menubar.add_cascade(label="语言 / Language", menu=self._lang_menu)
 
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="关于...", command=self._show_about)
+        self._help_cascade_index = menubar.index("end") + 1
+        menubar.add_cascade(label="帮助", menu=help_menu)
+
     def _build_toolbar(self):
         toolbar = tk.Frame(self.root)
         toolbar.pack(fill=tk.X, padx=4, pady=4)
@@ -711,6 +716,30 @@ class LighthouseConsoleApp:
             messagebox.showwarning("提示", "请先连接设备")
             return
         self._send_quick_command("param list")
+
+    def _show_about(self):
+        import webbrowser
+        about = Toplevel(self.root)
+        about.title(tr_text("关于"))
+        about.geometry("460x300")
+        about.resizable(False, False)
+        frame = tk.Frame(about, bg="white")
+        frame.pack(fill=tk.BOTH, expand=True)
+        tk.Label(frame, text="Lighthouse 基站控制台", bg="white",
+                 font=("", 15, "bold")).pack(pady=(26, 2))
+        tk.Label(frame, text="by Amadeus-AmA (AmA)", bg="white",
+                 font=("", 10, "bold"), fg="#2c3e50").pack()
+        tk.Label(frame, text="v1.0.3", bg="white", fg="#7f8c8d",
+                 font=("", 9)).pack(pady=(2, 10))
+        tk.Label(frame, text=tr_text("Vive/Lighthouse 2.0 基站串口维护工具\n"
+                                     "参数管理 · 履历校验 · 工厂校准参考 · 固件刷写"),
+                 bg="white", fg="#566573", justify=tk.CENTER).pack()
+        url = "https://github.com/Amadeus-AmA/Lighthouse_Terminal"
+        link = tk.Label(frame, text=url, bg="white", fg="#2980b9",
+                        font=("Consolas", 9, "underline"), cursor="hand2")
+        link.pack(pady=(12, 0))
+        link.bind("<Button-1>", lambda e: webbrowser.open(url))
+        ttk.Button(about, text=tr_text("关闭"), command=about.destroy).pack(pady=(10, 12))
 
     def _show_command_reference(self):
         ref = Toplevel(self.root)

@@ -13,7 +13,7 @@ LANGUAGE_NAMES = {"zh": "中文", "en": "English"}
 DEFAULT_LANGUAGE = "zh"
 
 TRANSLATIONS = {
-    "app.title": {"zh": "Lighthouse 基站控制台", "en": "Lighthouse Base Station Console"},
+    "app.title": {"zh": "Lighthouse 基站控制台 by_AmA", "en": "Lighthouse Base Station Console by_AmA"},
     "menu.file": {"zh": "文件", "en": "File"},
     "menu.exit": {"zh": "退出", "en": "Exit"},
     "menu.advanced": {"zh": "高级功能", "en": "Advanced"},
@@ -703,4 +703,15 @@ TEXT_EN.update({
     "少量坏记录常见于写入时断电或读取竞态, 一般非人为改动":
         "A few bad records are common after power loss during writes or read races; "
         "usually not intentional changes",
+})
+
+
+# ---------- 关于对话框 / 标题署名 ----------
+TEXT_EN.update({
+    "关于": "About",
+    "帮助": "Help",
+    "Vive/Lighthouse 2.0 基站串口维护工具\n"
+    "参数管理 · 履历校验 · 工厂校准参考 · 固件刷写":
+        "Serial maintenance tool for Vive/Lighthouse 2.0 base stations\n"
+        "Parameter management · history check · factory calibration reference · firmware flash",
 })
